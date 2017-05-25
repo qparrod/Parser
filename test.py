@@ -1,25 +1,18 @@
 #!/usr/bin/python2.7
 
+import re
+
 class Parser:
-    def __init__(self,_folder,_type):
-        self.folder=_folder
-        self.path= "/home/quentin/Python/"+ self.folder
+    def __init__(self):
         self.regex=''
-        self.type=_type
-        self.cpuload = 0
+        self.type=""
+        self.files = files
+        self.regex = None
+        self.map = {}
+        
 
-    def open(self):
-        print "open folder " + self.folder
-        import os
-        for filename in os.listdir(self.path):
-            print filename
-            # if filename = *.log
-            self.file = open(self.path+"/"+filename,"r")
-            print self.file
-
-    def match(self, expression, string):
-        import re
-        m = re.search(expression,string)
+    def search(self, _string):
+        m = self.regex.search(_string)
         if m:
             key   = m.group(1)
             value = m.group(2)
@@ -34,36 +27,38 @@ class Parser:
             if key not in self.map:
                 self.map[key] = []
             self.map[key].append(value)
-        return self.map
+
+    def dump(self):
+        print self.map
         
 
 class CpuLoad(Parser):
     def __init__(self):
-        Parser.__init__(self,"results","syslog")
-        self.cpuload = 0
-        self.map = {}
+        Parser.__init__(self)
+        self.type="syslog"
+        self.regex = re.compile(r'(FSP-\d+|\w+Vm) .* CPU [Ll]oad: (\d+)')
 
     def read(self):
-        Parser.open(self)
-        print "read Cpu Load"
-        import re
-        for line in self.file:
-            (core,load) = Parser.match(self,r'(FSP-\d+|\w+Vm) .* CPU [L|l]oad: (\d+)',line)
-            self.map = Parser.addToMap(self,(core,load))
-
-    def test(self):
-        print self.map
-
-    @property
-    def cpuload(self):
-        return self.cpuload
-
-    @cpuload.setter
-    def cpuload(self,v):
-        self.cpuload = v
+        for filename in self.files:
+            with open(filename) as f:
+                for line in f:
+                    Parser.addToMap(self,Parser.search(self,line)) # pair is (core,load)
 
 
-parser = CpuLoad()
-parser.read()
-parser.test()
-print (parser.cpuload)
+class PdcpPacket(Parser):
+    def __init__(self):
+        Parser.__init__(self)
+        self.type = "syslog"
+        self.toto = 0
+
+import os
+path  = "/home/quentin/Python/Parser/results"
+files = [path+"/"+filename for filename in os.listdir(path)]
+print files
+
+cpuload = CpuLoad()
+cpuload.read()
+cpuload.dump()
+
+pdcp = PdcpPacket()
+pdcp.dump()
