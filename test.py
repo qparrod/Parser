@@ -13,10 +13,7 @@ class Parser:
        
     def search(self, _string):
         m = self.regex.search(_string)
-        if m:
-            return (m.group(1),m.group(2))
-        else:
-            return ()
+        return (m.group(1),m.group(2)) if m else ()
 
     def dump(self):
         print self.map
@@ -65,16 +62,16 @@ class PdcpPacket(Parser):
                         self.map['receive'].append(int(receive))
 
     def noReceived(self):
-        return sum(element for element in self.map['receive'])
+        return sum(element for element in self.map['receive']) if 'receive' in self.map.keys() else 0
 
     def noSent(self):
-        return sum(element for element in self.map['send'])
+        return sum(element for element in self.map['send']) if 'send' in self.map.keys() else 0
 
     def averageReceived(self):
-        return PdcpPacket.noReceived(self)/len(self.map['receive'])
+        return PdcpPacket.noReceived(self)/len(self.map['receive']) if len(self.map['receive'])!= 0 else 0
 
     def averageReceived(self):
-        return PdcpPacket.noReceived(self)/len(self.map['send'])
+        return PdcpPacket.noReceived(self)/len(self.map['send']) if len(self.map['send'])!= 0 else 0
 
 import sys
 import getopt
