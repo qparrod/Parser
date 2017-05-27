@@ -2,6 +2,28 @@
 
 import re
 
+#filtrage in csv file
+import csv
+
+
+class Csv:
+    def __init__(self):
+        self.filename = ''
+        self.mode     = ''
+
+    def open(self, name):
+        self.filename = name
+        self.mode     = 'w'
+
+    def write(self, fields, data):
+        with open(self.filename,self.mode) as csvfile:
+            writer = csv.DictWriter(csvfile,fieldnames=fields)
+            writer.writeheader()
+            for elements in data:
+                writer.writerow(dict(zip(fields, elements)))
+
+
+
 class Parser:
     def __init__(self):
         global files
@@ -130,6 +152,63 @@ def main(argv):
     print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
     print pdcp.averageReceived()
 
+    #create csv files
+    docsv = Csv()
+    docsv.open('data.csv')
+    fields = ['ex1','ex2','ex3']
+    data = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
+    docsv.write(fields,data)
+
+    import plotly.plotly as py
+    import plotly.graph_objs as go 
+
+    from datetime import datetime
+    import pandas_datareader as web
+
+    #df = web.DataReader("aapl", 'yahoo',
+    #                    datetime(2017, 5, 1),
+    #                    datetime(2015, 1, 1))
+    start = datetime(2010, 1, 1)
+    end = datetime(2013, 1, 27)
+    df = web.DataReader("F", 'google', start, end)
+
+    trace = go.Scatter(x=df.index,
+                       y=df.High)
+
+    data = [trace]
+    layout = dict(
+        title='Time series with range slider and selectors',
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1,
+                         label='1m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=6,
+                         label='6m',
+                         step='month',
+                         stepmode='backward'),
+                    dict(count=1,
+                        label='YTD',
+                        step='year',
+                        stepmode='todate'),
+                    dict(count=1,
+                        label='1y',
+                        step='year',
+                        stepmode='backward'),
+                    dict(step='all')
+                ])
+            ),
+            rangeslider=dict(),
+            type='date'
+        )
+    )
+
+    fig = dict(data=data, layout=layout)
+    py.iplot(fig)
+
+
 if __name__ == "__main__":
     files=''
-    main(sys.argv[1:])
+    main(sys.argv[1:])  
