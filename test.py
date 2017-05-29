@@ -32,20 +32,24 @@ class Parser:
         self.files = files
         self.regex = None
         self.map = {}
+        self.count = 0
        
-    def search(self, _string, size):
+    def search(self, _string):
         m = self.regex.search(_string)
-        return (m.group(i+1) for i in range(size)) if m else ()
+        return (m.group(i+1) for i in range(self.count)) if m else ()
 
     def dump(self):
         print self.map
         
+
+
 
 class CpuLoad(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type="syslog"
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*)')
+        self.count = 3
 
     def read(self):
         print "self.files: " + str(self.files)
@@ -54,27 +58,29 @@ class CpuLoad(Parser):
                 print "read filename : " + filename
                 with open(filename) as f:
                     for line in f:
-                        values = Parser.search(self,line,3)
+                        values = Parser.search(self,line)
                         if(values!=()):
                             (core,timestamp,load)=values
                             if core not in self.map:
                                 self.map[core] = [()]
                             self.map[core].append((timestamp,float(load)))
 
+
+
 class PdcpPacket(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type = "syslog"
         self.regex = re.compile(r'send (\d+) receive (\d+)')
+        self.count = 2
 
     def read(self):
         for filename in self.files:
             with open(filename) as f:
                 for line in f:
-                    values = Parser.search(self,line,2)
+                    values = Parser.search(self,line)
                     if(values!=()):
-                        send = values[0]
-                        receive=values[1]
+                        (send, receive) = values
                         if 'send' not in self.map:
                             self.map['send'] = []
                         self.map['send'].append(int(send))
@@ -105,6 +111,7 @@ def main(argv):
     inputfile=''
     application='syslogAnalyzer'
     board='fsm3'
+    deployment = 'cloud fsm3 6dsp'
     try:
         opts, args = getopt.getopt(argv,"hi:a:b:",["application=","board="])
     except getopt.GetoptError as err:
@@ -131,6 +138,7 @@ def main(argv):
     print '+'+'-'*60+'+'
     print "|{:<18}{:>2} {:<20}{:>20}".format("application type",":",application,"|")
     print "|{:<18}{:>2} {:<20}{:>20}".format("board type",":",board,"|")
+    print "|{:<18}{:>2} {:<20}{:>20}".format("deployment",":",deployment,"|")
     print '+'+'-'*60+'+'
 
     # check all files in results folder
