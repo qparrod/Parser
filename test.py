@@ -33,9 +33,9 @@ class Parser:
         self.regex = None
         self.map = {}
        
-    def search(self, _string):
+    def search(self, _string, size):
         m = self.regex.search(_string)
-        return (m.group(1),m.group(2)) if m else ()
+        return (m.group(0)) if m else ()
 
     def dump(self):
         print self.map
@@ -45,21 +45,26 @@ class CpuLoad(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type="syslog"
-        self.regex = re.compile(r'(FSP-\d+|\w+Vm).*CPU [Ll]oad: (\d+)')
+        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(\w+)>.*CPU_Load=(\d+\.?\d?)')
+        self.regex = re.compile(r'CPU_Load=(\d+\.?\d?)')
 
     def read(self):
         print "self.files: " + str(self.files)
         for filename in self.files:
             print "read filename : " + filename
-            with open(filename) as f:
-                for line in f:
-                    values = Parser.search(self,line)
-                    if(values!=()):
-                        core=values[0]
-                        load=values[1]
-                        if core not in self.map:
-                            self.map[core] = []
-                        self.map[core].append(int(load))
+            if ( re.search(r'.*udplog_.*',filename) ):
+                print "UDPLOG !!!"
+                with open(filename) as f:
+                    for line in f:
+                        values = Parser.search(self,line,3)
+                        if(values!=()):
+                            (core,timestamp,load)=values
+                            print core
+                            print load
+                            if core not in self.map:
+                                self.map[core] = []
+                            self.map[core].append(int(load))
+            #else:
 
 
 class PdcpPacket(Parser):
@@ -72,7 +77,7 @@ class PdcpPacket(Parser):
         for filename in self.files:
             with open(filename) as f:
                 for line in f:
-                    values = Parser.search(self,line)
+                    values = Parser.search(self,line,2)
                     if(values!=()):
                         send = values[0]
                         receive=values[1]
@@ -137,8 +142,19 @@ def main(argv):
     # check all files in results folder
     import os
     path  = "/home/quentin/Python/Parser/results"
+    level=0
     global files
-    files = [path+"/"+filename for filename in os.listdir(path)]
+    #files = [path+"/"+filename for filename in os.listdir(path)]
+
+    files = []
+    for root, dirs, files in os.walk(path):
+        if (dirs != []):
+            emTrace = 'activated'
+            print "EM trace: "+emTrace
+            files = [os.path.join(root,name) for name in files]
+        break # do not use emTrace files yet
+
+    print files
 
     # parse cpu load data
     cpuload = CpuLoad()
@@ -146,11 +162,11 @@ def main(argv):
     cpuload.dump()
 
     #parse PDCP data
-    pdcp = PdcpPacket()
-    pdcp.read()
-    pdcp.dump()
-    print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
-    print pdcp.averageReceived()
+    #pdcp = PdcpPacket()
+    #pdcp.read()
+    #pdcp.dump()
+    #print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
+    #print pdcp.averageReceived()
 
     #create csv files
     docsv = Csv()
