@@ -45,8 +45,7 @@ class CpuLoad(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type="syslog"
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(\w+)>.*CPU_Load=(\d+\.?\d?)')
-        self.regex = re.compile(r'CPU_Load=(\d+\.?\d?)')
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*CPU_Load=(\d+\.?\d*)')
 
     def read(self):
         print "self.files: " + str(self.files)
@@ -63,9 +62,7 @@ class CpuLoad(Parser):
                             print load
                             if core not in self.map:
                                 self.map[core] = []
-                            self.map[core].append(int(load))
-            #else:
-
+                            self.map[core].append(float(load))
 
 class PdcpPacket(Parser):
     def __init__(self):
@@ -133,7 +130,7 @@ def main(argv):
             if board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):
                 print "wrong board type: " + board
                 sys.exit()
-
+    
     print '+'+'-'*60+'+'
     print "|{:<18}{:>2} {:<20}{:>20}".format("application type",":",application,"|")
     print "|{:<18}{:>2} {:<20}{:>20}".format("board type",":",board,"|")
@@ -141,20 +138,24 @@ def main(argv):
 
     # check all files in results folder
     import os
-    path  = "/home/quentin/Python/Parser/results"
-    level=0
+
+    #path = "/home/quentin/Python/Parser/results"
+    #user = os.environ['USER']
+    user = os.getlogin()
+    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    print path
     global files
     #files = [path+"/"+filename for filename in os.listdir(path)]
+    for dirpath, dirnames, filenames in os.walk(path):
+        if(dirnames!=[]):
+            emTrace='activated'
+            emTraceFolderName = dirnames[0]
+            files = [os.path.join(dirpath,name) for name in filenames]
+        break
 
-    files = []
-    for root, dirs, files in os.walk(path):
-        if (dirs != []):
-            emTrace = 'activated'
-            print "EM trace: "+emTrace
-            files = [os.path.join(root,name) for name in files]
-        break # do not use emTrace files yet
-
-    print files
+#from logs:
+    ## 1/check board type
+    ## 2/check deployment
 
     # parse cpu load data
     cpuload = CpuLoad()
@@ -175,7 +176,7 @@ def main(argv):
     data = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
     docsv.write(fields,data)
 
-    # plot graphs here
+    # plot graphs here no matplot lib on LINSEE
 
 
 if __name__ == "__main__":
