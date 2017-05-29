@@ -173,7 +173,6 @@ def main(argv):
     data = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
     docsv.write(fields,data)
 
-
     # plot graphs here no matplot lib on LINSEE
 
 
