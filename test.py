@@ -45,22 +45,22 @@ class CpuLoad(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type="syslog"
-        self.regex = re.compile(r'(FSP-\d+|\w+Vm).*CPU [Ll]oad: (\d+)')
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*CPU_Load=(\d+\.?\d*)')
 
     def read(self):
         print "self.files: " + str(self.files)
         for filename in self.files:
-            print "read filename : " + filename
-            with open(filename) as f:
-                for line in f:
-                    values = Parser.search(self,line)
-                    if(values!=()):
-                        core=values[0]
-                        load=values[1]
-                        if core not in self.map:
-                            self.map[core] = []
-                        self.map[core].append(int(load))
-
+            if(re.search(r'udplog_',filename)):
+                print "read filename : " + filename
+                with open(filename) as f:
+                    for line in f:
+                        values = Parser.search(self,line)
+                        if(values!=()):
+                            core=values[0]
+                            load=values[1]
+                            if core not in self.map:
+                                self.map[core] = []
+                            self.map[core].append(float(load))
 
 class PdcpPacket(Parser):
     def __init__(self):
@@ -128,7 +128,7 @@ def main(argv):
             if board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):
                 print "wrong board type: " + board
                 sys.exit()
-
+    
     print '+'+'-'*60+'+'
     print "|{:<18}{:>2} {:<20}{:>20}".format("application type",":",application,"|")
     print "|{:<18}{:>2} {:<20}{:>20}".format("board type",":",board,"|")
@@ -136,9 +136,23 @@ def main(argv):
 
     # check all files in results folder
     import os
-    path  = "/home/quentin/Python/Parser/results"
+    #path = "/home/quentin/Python/Parser/results"
+    #user = os.environ['USER']
+    user = os.getlogin()
+    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    print path
     global files
-    files = [path+"/"+filename for filename in os.listdir(path)]
+    #files = [path+"/"+filename for filename in os.listdir(path)]
+    for dirpath, dirnames, filenames in os.walk(path):
+        if(dirnames!=[]):
+            emTrace='activated'
+            emTraceFolderName = dirnames[0]
+            files = [os.path.join(dirpath,name) for name in filenames]
+        break
+
+#from logs:
+    ## 1/check board type
+    ## 2/check deployment
 
     # parse cpu load data
     cpuload = CpuLoad()
@@ -146,11 +160,11 @@ def main(argv):
     cpuload.dump()
 
     #parse PDCP data
-    pdcp = PdcpPacket()
-    pdcp.read()
-    pdcp.dump()
-    print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
-    print pdcp.averageReceived()
+    #pdcp = PdcpPacket()
+    #pdcp.read()
+    #pdcp.dump()
+    #print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
+    #print pdcp.averageReceived()
 
     #create csv files
     docsv = Csv()
@@ -159,7 +173,8 @@ def main(argv):
     data = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
     docsv.write(fields,data)
 
-    # plot graphs here
+
+    # plot graphs here no matplot lib on LINSEE
 
 
 if __name__ == "__main__":
