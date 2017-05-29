@@ -35,7 +35,7 @@ class Parser:
        
     def search(self, _string, size):
         m = self.regex.search(_string)
-        return (m.group(0)) if m else ()
+        return (m.group(i+1) for i in range(size)) if m else ()
 
     def dump(self):
         print self.map
@@ -45,24 +45,21 @@ class CpuLoad(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.type="syslog"
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*CPU_Load=(\d+\.?\d*)')
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*)')
 
     def read(self):
         print "self.files: " + str(self.files)
         for filename in self.files:
-            print "read filename : " + filename
             if ( re.search(r'.*udplog_.*',filename) ):
-                print "UDPLOG !!!"
+                print "read filename : " + filename
                 with open(filename) as f:
                     for line in f:
                         values = Parser.search(self,line,3)
                         if(values!=()):
                             (core,timestamp,load)=values
-                            print core
-                            print load
                             if core not in self.map:
-                                self.map[core] = []
-                            self.map[core].append(float(load))
+                                self.map[core] = [()]
+                            self.map[core].append((timestamp,float(load)))
 
 class PdcpPacket(Parser):
     def __init__(self):
@@ -139,10 +136,10 @@ def main(argv):
     # check all files in results folder
     import os
 
-    #path = "/home/quentin/Python/Parser/results"
-    #user = os.environ['USER']
-    user = os.getlogin()
-    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    path = "/home/quentin/Python/Parser/results"
+    user = os.environ['USER']
+    #user = os.getlogin()
+    #path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print path
     global files
     #files = [path+"/"+filename for filename in os.listdir(path)]
