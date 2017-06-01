@@ -31,57 +31,92 @@ class Parser:
         self.type=""
         self.files = files
         self.regex = None
-        self.map = {}
         self.count = 0
        
-    def search(self, _string):
-        m = self.regex.search(_string)
-        return (m.group(i+1) for i in range(self.count)) if m else ()
+    def search(self,parser, _string):
+        m = parser.regex.search(_string)
+        return (m.group(i+1) for i in range(parser.count)) if m else ()
 
-    def dump(self):
-        print self.map
-        
-
-
-
-class CpuLoad(Parser):
-    def __init__(self):
-        Parser.__init__(self)
-        self.type="syslog"
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*) max=(\d+\.?\d*)')
-        self.count = 4
 
     def read(self):
-        print "self.files: " + str(self.files)
+        rlcpacket = RlcPacket()
+        self.rlcMap  = {}
+        self.pdcpMap = {}
+        cpuload = CpuLoad()
+        self.cpuloadMap = {}
         for filename in self.files:
             if ( re.search(r'.*udplog_.*',filename) ):
                 print "read filename : " + filename
                 with open(filename) as f:
                     for line in f:
-                        values = Parser.search(self,line)
+                        cpuload.read()
+                        values = self.search(cpuload,line)
                         if(values!=()):
                             (core,timestamp,load,max)=values
-                            if core not in self.map:
-                                self.map[core] = [()]
-                            self.map[core].append((timestamp,float(load)))
+                            if core not in self.cpuloadMap:
+                                self.cpuloadMap[core] = [()]
+                            self.cpuloadMap[core].append((timestamp,float(load)))
+
+                        rlcpacket.readRcvdRcvp()
+                        values = self.search(rlcpacket,line)
+                        if(values!=()):
+                            (core,timestamp,rcvd,rcvp,ackd,ackp)=values
+                            if core not in self.rlcMap:
+                                self.rlcMap[core] = [()]
+                            self.rlcMap[core].append("rcvd:" + rcvd)
+
+
+    def dump(self):
+        print "\ndump CPU load information:"
+        print self.cpuloadMap
+        print "\ndump RLC information:"
+        print self.rlcMap
+        #print "\ndump PDCP information:"
+        #print self.pdcpMap
+
+
+
+class CpuLoad():
+    def __init__(self):
+        self.count = 0
+        self.regex = None
+
+    def read(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*) max=(\d+\.?\d*)')
+        self.count = 4
+
+
+class RlcPacket():
+    def __init__(self):
+        self.count = 0
+
+    def readRcvdRcvp(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
+        self.count = 6
+
+
+    def readBuffer(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
+        self.count = 4
+
+
+class PoolStats(Parser):
+    def __init(self):
+        Parser.__init(self)
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/EventPools: P: (\d+).*(\d*.?\d*)C: (\d+) LB: (\d+) L: (\d+) NB: (\d+).*(\d*).*(\d*).*(\d*).*(\d*).*(\d*)')  
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/SduPools: SRB:(\d+/\d+) SDU1:(\d+) SDU2:(\d+) .+ fully used:(\d*/\d*)')
 
 
 
 class PdcpPacket(Parser):
     def __init__(self):
         Parser.__init__(self)
-        self.type = "syslog"
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/EventPools: P: (\d+).*(\d*.?\d*)C: (\d+) LB: (\d+) L: (\d+) NB: (\d+).*(\d*).*(\d*).*(\d*).*(\d*).*(\d*)')  
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/SduPools: SRB:(\d+/\d+) SDU1:(\d+) SDU2:(\d+) .+ fully used:(\d*/\d*)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SR: (\d+) OOD: (\d+) OOM X2: (\d+) drb: (\d+) srb: (\d+) gtpu: (\d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: SRB toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK#1: (\d+ \d+ \d+) NACK#2: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) SA SwQ/Tx/Rx: \d+/\d+/\d+ \d+/\d+/\d+ \d+/\d+/\d+ \[\d+\] WinStall: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+) SR: (\d+) RoHCF: (\d+) toSGW: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DISCARD/DL: TmrData (\d+ \d+ \d+) TmrPackets (\d+ \d+ \d+) AqmData (\d+ \d+ \d+) AqmPackets (\d+ \d+ \d+)')
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*DLUE STATS \d/.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+)')
         self.regex = re.compile(r'8:(\d+) 9:(\d+) 10:(\d+)')
         self.count = 2
@@ -175,9 +210,9 @@ def main(argv):
     ## 2/check deployment
 
     # parse cpu load data
-    cpuload = CpuLoad()
-    cpuload.read()
-    cpuload.dump()
+    #cpuload = CpuLoad()
+    #cpuload.read()
+    #cpuload.dump()
 
     #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
     #       -> need to understand logs stats
@@ -186,6 +221,13 @@ def main(argv):
     #pdcp.dump()
     #print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
     #print pdcp.averageReceived()
+
+    parser=Parser()
+    parser.read()
+    parser.dump()
+    #rlc = RlcPacket()
+    #rlc.readBuffer()
+    #rlc.dump()
 
     #create csv files
     docsv = Csv()
