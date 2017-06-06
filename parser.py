@@ -2,6 +2,8 @@
 
 import re
 import pdcp
+import rlc
+import mac
 from csvWriter import Csv
 
 
@@ -22,6 +24,7 @@ class Parser:
     def read(self):
         rlcpacket = RlcPacket()
         self.rlcMap  = {}
+        pdcppacket = PdcpPacket()
         self.pdcpMap = {}
         cpuload = CpuLoad()
         self.cpuloadMap = {}
@@ -37,6 +40,8 @@ class Parser:
                             if core not in self.cpuloadMap:
                                 self.cpuloadMap[core] = [()]
                             self.cpuloadMap[core].append((timestamp,float(load)))
+
+                        pdcppacket.read()
 
                         rlcpacket.readRcvdRcvp()
                         values = self.search(rlcpacket,line)
