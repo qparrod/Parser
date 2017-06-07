@@ -5,11 +5,9 @@ from layers import *
 from csvWriter import Csv
 import settings
 import csv
+from datetime import datetime
 
 class ProgressBar:
-    '''
-    Progress bar
-    '''
     def __init__ (self, valmax, maxbar, title):
         if valmax == 0:  valmax = 1
         if maxbar > 200: maxbar = 200
@@ -17,17 +15,22 @@ class ProgressBar:
         self.maxbar = maxbar
         self.title  = title
     
-    def update(self, val):
+    def update(self, val, seconds):
         import sys
-        # process
-        perc  = round((float(val) / float(self.valmax)) * 100)
+        perc  = int(round((float(val) / float(self.valmax)) * 100))
         scale = 100.0 / float(self.maxbar)
         bar   = int(perc / scale)
   
-        # render 
-        out = '\r %s [%s%s] %3d %%' % (self.title, '=' * bar, ' ' * (self.maxbar - bar), perc)
+        out = '\r{0}  {1:>3}% [{2}{3}] {4:>6}/{5:>6}   | ETA: {6:}s'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,seconds)
         sys.stdout.write(out)
         sys.stdout.flush()
+
+def file_len(fname):
+    with open(fname) as f:
+        for i, l in enumerate(f):
+            pass
+    return i + 1
+    
 
 class Parser:
     def __init__(self):
@@ -36,6 +39,7 @@ class Parser:
         self.files = settings.files
         self.regex = None
         self.count = 0
+        self.pdcpthroughput = []
        
     def search(self,parserType, _string):
         m = parserType.regex.search(_string)
@@ -50,14 +54,26 @@ class Parser:
         cpuload = CpuLoad()
         self.cpuloadMap = {}
         cpuloadcsv = open('cpuload.csv','w')
+        pdcpcsv1 = open('pdcp1.csv','w')
+        cpuloadwriter = csv.writer(cpuloadcsv)
+        pdcp1writer = csv.writer(pdcpcsv1)
+        cpuloadwriter.writerow(['timestamp','core','load','max'])
+        pdcp1writer.writerow(['timestamp','core','s1','x2','bytes','ACK','NACK'])
         for filename in self.files:
             if ( re.search(r'.*udplog_.*',filename) ):
-                print "read filename : " + filename
-                Bar = ProgressBar(100, 60, '')
-                for i in xrange(100):
-                    Bar.update(i)
+                print "\nread filename : " + filename
+                Bar = ProgressBar(file_len(filename),60, ' ')
+                d = datetime.now()
                 with open(filename) as f:
+                    lineNumber=0
                     for line in f:
+                        lineNumber=lineNumber+1
+                        if (lineNumber%250==0):
+                            delta = datetime.now() - d
+                            seconds = int(delta.total_seconds())
+                            Bar.update(lineNumber,seconds)
+
+                        # CPU load
                         cpuload.read()
                         values = self.search(cpuload,line)
                         if(values!=()):
@@ -65,21 +81,24 @@ class Parser:
                             if core not in self.cpuloadMap:
                                 self.cpuloadMap[core] = [()]
                             self.cpuloadMap[core].append((timestamp,float(load)))
-                            cpuloadwriter = csv.writer(cpuloadcsv)
-                            cpuloadwriter.writerow(['timestamp','core','load','max'])
                             cpuloadwriter.writerow([timestamp,core,load,max])
-                            
+                          
+                        # PDCP
                         pdcppacket.read()
                         values = self.search(pdcppacket,line)
                         if(values!=()):
-                            (core, timestamp, s1, x2, send, receive, a, a, a) = values
-                            if 'send' not in self.pdcpMap:
-                                self.pdcpMap['send'] = []
-                            #self.pdcpMap['send'].append(int(send))
-                            if 'receive' not in self.pdcpMap:
-                                self.pdcpMap['receive'] = []
-                            #self.pdcpMap['receive'].append(int(receive))                       
+                            (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
+                            [test2,test4,test6] = [int(s) for s in inbytes.split() if s.isdigit()]
+                            pdcp1writer.writerow([timestamp,soc,s1,x2,inbytes,ack,nack])
+                            if (core=='LINUX-Disp_1'):
+                                throughput2s = test2*8/2.0/1024.0 # kbps
+                                throughput4s = test4*8/2.0/1024.0
+                                throughput6s = test6*8/2.0/1024.0
+                                self.pdcpthroughput.append(throughput2s)
+                                self.pdcpthroughput.append(throughput4s)
+                                self.pdcpthroughput.append(throughput6s)
  
+                        # RLC
                         rlcpacket.readRcvdRcvp()
                         values = self.search(rlcpacket,line)
                         if(values!=()):
@@ -87,6 +106,11 @@ class Parser:
                             if core not in self.rlcMap:
                                 self.rlcMap[core] = [()]
                             self.rlcMap[core].append("rcvd:" + rcvd)
+
+                        # MAC
+
+                    seconds = int(delta.total_seconds())
+                    Bar.update(lineNumber,seconds)
         cpuloadcsv.close()
 
     def dump(self):
@@ -97,7 +121,8 @@ class Parser:
         #print "\ndump PDCP information:"
         #print self.pdcpMap
 
-
+    def dumpThroughput(self):
+        print self.pdcpthroughput
 
 class CpuLoad():
     def __init__(self):
@@ -130,6 +155,7 @@ def usage():
 
 
 def main(argv):
+    
     inputfile=''
     application='syslogAnalyzer'
     board='fsm3'
@@ -197,18 +223,10 @@ def main(argv):
 
     #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
     #       -> need to understand logs stats
-    #pdcp = PdcpPacket()
-    #pdcp.read()
-    #pdcp.dump()
-    #print "received {} and sent {} PDPC packets".format(pdcp.noReceived(),pdcp.noSent())
-    #print pdcp.averageReceived()
-
     parser=Parser()
     parser.read()
-    parser.dump()
-    #rlc = RlcPacket()
-    #rlc.readBuffer()
-    #rlc.dump()
+    #parser.dump()
+    parser.dumpThroughput()
 
     #create csv files
     docsv = Csv()
@@ -218,7 +236,8 @@ def main(argv):
     docsv.write(fields,data)
 
     # plot graphs here no matplot lib on LINSEE
-
+    
+    print "\n"
 
 if __name__ == "__main__":
     settings.init()
