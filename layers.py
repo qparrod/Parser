@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 
 from parser import Parser
+import re
 
 class PdcpPacket(Parser):
     def __init__(self):
@@ -16,18 +17,8 @@ class PdcpPacket(Parser):
         self.count = 2
 
     def read(self):
-        for filename in self.files:
-            with open(filename) as f:
-                for line in f:
-                    values = Parser.search(self,line)
-                    if(values!=()):
-                        (send, receive) = values
-                        if 'send' not in self.map:
-                            self.map['send'] = []
-                        self.map['send'].append(int(send))
-                        if 'receive' not in self.map:
-                            self.map['receive'] = []
-                        self.map['receive'].append(int(receive))
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)')
+        self.count = 9
 
     def noReceived(self):
         return sum(element for element in self.map['receive']) if 'receive' in self.map.keys() else 0
@@ -40,3 +31,20 @@ class PdcpPacket(Parser):
 
     def averageReceived(self):
         return PdcpPacket.noReceived(self)/len(self.map['send']) if len(self.map['send'])!= 0 else 0
+
+
+
+
+class RlcPacket(Parser):
+    def __init__(self):
+        self.count = 0
+
+    def readRcvdRcvp(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
+        self.count = 6
+
+
+    def readBuffer(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
+        self.count = 4
+
