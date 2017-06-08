@@ -7,6 +7,7 @@ import settings
 import csv
 from datetime import datetime
 
+
 class ProgressBar:
     def __init__ (self, valmax, maxbar, title):
         if valmax == 0:  valmax = 1
@@ -34,12 +35,10 @@ def file_len(fname):
 
 class Parser:
     def __init__(self):
-        self.regex=''
-        self.type=""
+        self.regex = ''
         self.files = settings.files
         self.regex = None
         self.count = 0
-        self.pdcpthroughput = []
        
     def search(self,parserType, _string):
         m = parserType.regex.search(_string)
@@ -47,18 +46,18 @@ class Parser:
 
 
     def read(self):
-        rlcpacket = RlcPacket()
-        self.rlcMap  = {}
+        rlcpacket  = RlcPacket()
         pdcppacket = PdcpPacket()
-        self.pdcpMap = {}
-        cpuload = CpuLoad()
-        self.cpuloadMap = {}
+        cpuload    = CpuLoad()
+
         cpuloadcsv = open('cpuload.csv','w')
-        pdcpcsv1 = open('pdcp1.csv','w')
         cpuloadwriter = csv.writer(cpuloadcsv)
-        pdcp1writer = csv.writer(pdcpcsv1)
         cpuloadwriter.writerow(['timestamp','core','load','max'])
-        pdcp1writer.writerow(['timestamp','core','s1','x2','bytes','ACK','NACK'])
+
+        self.cpuload        = {}
+        self.pdcpthroughput = {}
+        self.rlcthroughput  = {}
+        self.macthroughput  = {}
         # warning : sort self.files depending on filename timestamp
         for filename in self.files:
             if ( re.search(r'.*udplog_.*',filename) ):
@@ -71,6 +70,7 @@ class Parser:
                         lineNumber=lineNumber+1
                         if (lineNumber%250==0):
                             delta = datetime.now() - d
+                            d = datetime.now()
                             seconds = int(delta.total_seconds())
                             Bar.update(lineNumber,seconds)
 
@@ -79,9 +79,9 @@ class Parser:
                         values = self.search(cpuload,line)
                         if(values!=()):
                             (core,timestamp,load,max)=values
-                            if core not in self.cpuloadMap:
-                                self.cpuloadMap[core] = [()]
-                            self.cpuloadMap[core].append((timestamp,float(load)))
+                            if core not in self.cpuload:
+                                self.cpuload[core] = []
+                            self.cpuload[core].append((timestamp,float(load)))
                             cpuloadwriter.writerow([timestamp,core,load,max])
                           
                         # PDCP
@@ -89,44 +89,35 @@ class Parser:
                         values = self.search(pdcppacket,line)
                         if(values!=()):
                             (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
-                            [test2,test4,test6] = [int(s) for s in inbytes.split() if s.isdigit()]
-                            pdcp1writer.writerow([timestamp,soc,s1,x2,inbytes,ack,nack])
-                            if (core=='LINUX-Disp_1'):
-                                throughput2s = test2*8/2.0/1024.0 # kbps
-                                throughput4s = test4*8/2.0/1024.0
-                                throughput6s = test6*8/2.0/1024.0
-                                self.pdcpthroughput.append(throughput2s)
-                                self.pdcpthroughput.append(throughput4s)
-                                self.pdcpthroughput.append(throughput6s)
+                            [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
+                            if core not in self.pdcpthroughput:
+                                self.pdcpthroughput[core] = []
+                            self.pdcpthroughput[core].append((timestamp,val1*8/2.0/1024))
+                            self.pdcpthroughput[core].append((timestamp,val2*8/2.0/1024))
+                            self.pdcpthroughput[core].append((timestamp,val3*8/2.0/1024))
  
                         # RLC
                         rlcpacket.readRcvdRcvp()
                         values = self.search(rlcpacket,line)
                         if(values!=()):
                             (core,timestamp,rcvd,rcvp,ackd,ackp)=values
-                            if core not in self.rlcMap:
-                                self.rlcMap[core] = [()]
-                            self.rlcMap[core].append("rcvd:" + rcvd)
+                            [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
+                            if core not in self.rlcthroughput:
+                                self.rlcthroughput[core] = []
+                            self.rlcthroughput[core].append((timestamp,val1*8/2.0/1024))
+                            self.rlcthroughput[core].append((timestamp,val2*8/2.0/1024))
+                            self.rlcthroughput[core].append((timestamp,val3*8/2.0/1024))
 
                         # MAC
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
-
+                    delta = datetime.now() - d
+                    d = datetime.now()
                     seconds = int(delta.total_seconds())
                     Bar.update(lineNumber,seconds)
         cpuloadcsv.close()
-
-    def dump(self):
-        print "\ndump CPU load information:"
-        print self.cpuloadMap
-        print "\ndump RLC information:"
-        print self.rlcMap
-        #print "\ndump PDCP information:"
-        #print self.pdcpMap
-
-    def dumpThroughput(self):
-        print self.pdcpthroughput
+        print "\n"
 
     def getPDCPThroughput(self):
         return self.pdcpthroughput
@@ -136,6 +127,8 @@ class Parser:
 
     def getMACThroughput(self):
         return self.macthroughput
+
+
 
 class CpuLoad():
     def __init__(self):
@@ -199,10 +192,10 @@ def main(argv):
     # check all files in results folder
     import os
 
-    #path = "/home/quentin/Python/Parser/results"
+    path = "/home/quentin/Python/Parser/results"
     user = os.environ['USER']
     #user = os.getlogin()
-    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    #path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "path=" + path
     #files = [path+"/"+filename for filename in os.listdir(path)]
     for dirpath, dirnames, filenames in os.walk(path):
@@ -216,6 +209,8 @@ def main(argv):
     if (len(settings.files)==0):
         print '\033[91m' + "no file in path" + '\033[0m'
         exit();
+
+    settings.files.sort()
 
     udplognb = 0
     for filename in settings.files:
@@ -246,8 +241,6 @@ def main(argv):
     print '+'+'-'*60+'+'
     print '\033[0m'
 
-    
-
     ## 2/check deployment
 
     # parse cpu load data
@@ -259,29 +252,35 @@ def main(argv):
     #       -> need to understand logs stats
     parser=Parser()
     parser.read()
-    #parser.dump()
-    parser.dumpThroughput()
+    print "\n"
 
     throughput = parser.getPDCPThroughput()
-    pdcpthoughput =  open('throughput.csv','w')
+    pdcpthoughput =  open('pdcpthroughput.csv','w')
     pdcpthroughputwriter = csv.writer(pdcpthoughput)
-    pdcpthroughputwriter.writerow(['throughput in kbps'])
-    pdcpthroughputwriter.writerow(['PDCP,RLC,MAC'])
-    for tput in throughput:
-        pdcpthroughputwriter.writerow([tput])
+    pdcpthroughputwriter.writerow(['timestamp','core','PDCP throughput in kbps'])
+
+    for line in throughput:
+        pdcpthroughputwriter.writerow(line)
+
     pdcpthoughput.close()
     
 
-    #create csv files
-    docsv = Csv()
-    docsv.open('data.csv')
-    fields = ['ex1','ex2','ex3']
-    data = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
-    docsv.write(fields,data)
-
     # plot graphs here no matplot lib on LINSEE
+    import matplotlib.pyplot as plt
+    import numpy
+    #per_data=numpy.genfromtxt('pdcpthroughput.csv',delimiter=',')
+    plt.xlabel ('time')
+    plt.ylabel ('throughput in kbps')
     
-    print "\n"
+    for core in throughput:
+        plt.title('PDCP throughput')
+        print throughput[core]
+        time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
+        value= [x[1] for x in throughput[core]]
+        print time
+        print value
+        plt.plot(time,value,label=core)
+    plt.show()
 
 if __name__ == "__main__":
     settings.init()
