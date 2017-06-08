@@ -110,6 +110,9 @@ class Parser:
 
                         # MAC
 
+                        #PHY stub
+                        # CBitrate:: ... Kilobits pers second on CellId.. 
+
                     seconds = int(delta.total_seconds())
                     Bar.update(lineNumber,seconds)
         cpuloadcsv.close()
