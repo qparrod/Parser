@@ -59,6 +59,7 @@ class Parser:
         pdcp1writer = csv.writer(pdcpcsv1)
         cpuloadwriter.writerow(['timestamp','core','load','max'])
         pdcp1writer.writerow(['timestamp','core','s1','x2','bytes','ACK','NACK'])
+        # warning : sort self.files depending on filename timestamp
         for filename in self.files:
             if ( re.search(r'.*udplog_.*',filename) ):
                 print "\nread filename : " + filename
@@ -124,6 +125,15 @@ class Parser:
     def dumpThroughput(self):
         print self.pdcpthroughput
 
+    def getPDCPThroughput(self):
+        return self.pdcpthroughput
+
+    def getRLCThroughput(self):
+        return self.rlcthroughput
+
+    def getMACThroughput(self):
+        return self.macthroughput
+
 class CpuLoad():
     def __init__(self):
         self.count = 0
@@ -183,14 +193,6 @@ def main(argv):
                 print "wrong board type: " + board
                 sys.exit()
     
-    print '\033[1m'
-    print '+'+'-'*60+'+'
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
-    print '+'+'-'*60+'+'
-    print '\033[0m'
-
     # check all files in results folder
     import os
 
@@ -212,8 +214,37 @@ def main(argv):
         print '\033[91m' + "no file in path" + '\033[0m'
         exit();
 
+    udplognb = 0
+    for filename in settings.files:
+        if ( re.search(r'.*udplog_.*',filename) ):
+            udplognb=udplognb+1
+    print "number of udplog files in path: {}".format(udplognb)
 #from logs:
     ## 1/check board type
+    cloud = False
+    for filename in settings.files:
+        if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
+            with open(filename,'r') as f:
+                for line in f:
+                    if(re.search(r'VM-\d+.+',line)): cloud=True
+                    m = re.search(r'Detected module (.*) and',line)
+                    if (m): board = m.group(1)
+                    m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
+                    if (m): deployment = m.group(1)
+            break
+                        
+
+    print '\033[1m'
+    print '+'+'-'*60+'+'
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
+    if (cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
+    print '+'+'-'*60+'+'
+    print '\033[0m'
+
+    
+
     ## 2/check deployment
 
     # parse cpu load data
@@ -227,6 +258,16 @@ def main(argv):
     parser.read()
     #parser.dump()
     parser.dumpThroughput()
+
+    throughput = parser.getPDCPThroughput()
+    pdcpthoughput =  open('throughput.csv','w')
+    pdcpthroughputwriter = csv.writer(pdcpthoughput)
+    pdcpthroughputwriter.writerow(['throughput in kbps'])
+    pdcpthroughputwriter.writerow(['PDCP,RLC,MAC'])
+    for tput in throughput:
+        pdcpthroughputwriter.writerow([tput])
+    pdcpthoughput.close()
+    
 
     #create csv files
     docsv = Csv()
