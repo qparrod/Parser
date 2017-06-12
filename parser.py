@@ -21,8 +21,11 @@ class ProgressBar:
         perc  = int(round((float(val) / float(self.valmax)) * 100))
         scale = 100.0 / float(self.maxbar)
         bar   = int(perc / scale)
-  
-        out = '\r{0}  {1:>3}% [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
+ 
+        if (perc!=100): 
+            out = '\r{0} \033[1m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
+        else:
+            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
         sys.stdout.write(out)
         sys.stdout.flush()
 
@@ -112,9 +115,9 @@ class Parser:
                         # CBitrate:: ... Kilobits pers second on CellId.. 
                     Bar.update(lineNumber,datetime.now() - d)
         cpuloadcsv.close()
-        print "\n"+'  +'+'-'*110 + '+'
+        print "\n"+'   -'+'-'*108 + '+'
         totalTime = datetime.now() - totalTime
-        print "  total time: {0:}:{1:02d}:{2:02d}.{3:03d}\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
         
 
     def getPDCPThroughput(self):
@@ -167,8 +170,9 @@ def main(argv):
     application='syslogAnalyzer'
     board='fsm3'
     deployment = 'cloud fsm3 6dsp'
+    graphAllowed = False
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:",["application=","board="])
+        opts, args = getopt.getopt(argv,"ghi:a:b:",["application=","board="])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -177,6 +181,8 @@ def main(argv):
         if opt == '-h':
             usage()
             sys.exit()
+        elif opt == '-g':
+            graphAllowed = True
         elif opt in ("-i", "--ifile"):
             inputfile = arg
         elif opt in ("-a", "--application"):
@@ -192,7 +198,6 @@ def main(argv):
     
     # check all files in results folder
     import os
-
     #path = "/home/quentin/Python/Parser/results"
     user = os.environ['USER']
     #user = os.getlogin()
@@ -219,11 +224,17 @@ def main(argv):
             udplognb=udplognb+1
     print "number of udplog files in path: {}".format(udplognb)
 
-    directory='csv'
+    csvDirectory='csv'
+    directory=csvDirectory
     if os.path.exists(directory):
         import shutil
         shutil.rmtree(directory)
     os.makedirs(directory)
+
+    throughputDirectory='throughput'
+    cpuloadDirectory='cpuload'
+    os.makedirs(directory+'/'+throughputDirectory)
+    os.makedirs(directory+'/'+cpuloadDirectory)
 
     ## check board type and deployment from startup log
     cloud = False
@@ -245,16 +256,32 @@ def main(argv):
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
     print '+'+'-'*60+'+' + '\033[0m'
 
+    if (graphAllowed):
+        import curses
+        screen = curses.initscr()
+        screen.immedok(True)
+        try:
+            screen.border(0)
+            box1 = curses.newwin(20, 20, 5, 5)
+            box1.immedok(True)
+            box1.box()    
+            box1.addstr("Hello World of Curses!")
+            screen.getch()
+            curses.endwin()
+
+        finally:
+            curses.endwin()
+        
     #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
     #       -> need to understand logs stats
     parser=Parser()
     parser.read()
 
-    createCsv('PDCP',parser.getPDCPThroughput())
-    createCsv('RLC',parser.getRLCThroughput())
-    createCsv('MAC',parser.getMACThroughput())
+    createCsvThroughput('PDCP',parser.getPDCPThroughput())
+    createCsvThroughput('RLC',parser.getRLCThroughput())
+    createCsvThroughput('MAC',parser.getMACThroughput())
 
-    createCsv('CpuLoad',parser.getCpuLoad())
+    createCsvLoad(parser.getCpuLoad())
 
     # plot graphs here no matplot lib on LINSEE
     #import matplotlib.pyplot as plt
@@ -273,15 +300,34 @@ def main(argv):
     #    plt.plot(time,value,label=core)
     #plt.show()
 
-def createCsv(layerName,data):
+
+def createCsv(name,type,data):
     throughput = data
     for core in throughput:
-        fd = open('csv/{}throughput_{}.csv'.format(layerName,core),'w')
+        directory = ''
+        header= []
+        if (type=="throughput"):
+            directory = 'throughput'
+            header = ['timestamp','{} {} in kbps for core {}'.format(name,type,core)]
+        elif (type=="load"):
+            directory = 'cpuload'
+            header = ['timestamp','{} {} in % for core {}'.format(name,type,core)]
+        else:
+            print "csv file type not recognized"
+            exit()
+        fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
         writer = csv.writer(fd)
-        writer.writerow(['timestamp','{} throughput in kbps for core {}'.format(layerName,core)])
+        writer.writerow(header)
         for line in throughput[core]:
             writer.writerow(line)
         fd.close()
+
+def createCsvThroughput(layerName,data):
+    createCsv(layerName,'throughput',data)
+
+def createCsvLoad(data):
+    createCsv('CPU','load',data)
+
 
 if __name__ == "__main__":
     settings.init()
