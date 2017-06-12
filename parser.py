@@ -25,7 +25,8 @@ class ProgressBar:
         if (perc!=100): 
             out = '\r{0} \033[1m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
         else:
-            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
+            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
+
         sys.stdout.write(out)
         sys.stdout.flush()
 
@@ -269,48 +270,95 @@ def main(argv):
     print '+'+'-'*60+'+' + '\033[0m'
 
     if (graphAllowed):
+
+        from os import system
         import curses
+
+        def get_param(prompt_string):
+             screen.clear()
+             screen.border(0)
+             screen.addstr(2, 2, prompt_string)
+             screen.refresh()
+             input = screen.getstr(10, 10, 60)
+             return input
+
+        def execute_cmd(cmd_string):
+             system("clear")
+             a = system(cmd_string)
+             print ""
+             if a == 0:
+                  print "Command executed correctly"
+             else:
+                  print "Command terminated with error"
+             raw_input("Press enter")
+             print ""
+
+        x = 0
+
+        while x != ord('Q'):
+             screen = curses.initscr()
+
+             screen.clear()
+             screen.border(0)
+             screen.addstr(2, 2, "Please enter a number...")
+             screen.addstr(4, 4, "1 - Throughput")
+             screen.addstr(5, 4, "2 - CPU load")
+             screen.addstr(7, 4, "Q - Exit")
+             screen.refresh()
+
+             x = screen.getch()
+
+             if x == ord('1'):
+                 selectedLayer = get_param("Enter the layer (PDCP, RLC, MAC)")
+                 selectedCore  = get_param("Enter the core (UeVM,CellVM,1233)")
+                 curses.endwin()
+                 #execute_cmd("useradd -d " + homedir + " -g 1000 -G " + groups + " -m -s " + shell + " " + username)
+             if x == ord('2'):
+                 selectedCore = get_param("Enter the core (UeVM,CellVM,1233)")
+                 curses.endwin()
+                 #execute_cmd("apachectl restart")
+             if x == ord('3'):
+                 curses.endwin()
+                 execute_cmd("df -h")
+             screen.refresh()
+             screen.clear()
+
+        curses.endwin()
+
         screen = curses.initscr()
-        screen.immedok(True)
-        try:
-            screen.border(0)
-            box1 = curses.newwin(20, 20, 5, 5)
-            box1.immedok(True)
-            box1.box()    
-            box1.addstr("Hello World of Curses!")
-            screen.getch()
-            curses.endwin()
+        screen.clear()
+        screen.border(1)
+        screen.vline(10,10,'|',100)
 
-        finally:
-            curses.endwin()
+    else:
+
+        #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
+        #       -> need to understand logs stats
+        parser=Parser()
+        parser.read()
+
+        createCsvThroughput('PDCP',parser.getPDCPThroughput())
+        createCsvThroughput('RLC',parser.getRLCThroughput())
+        createCsvThroughput('MAC',parser.getMACThroughput())
+
+        createCsvLoad(parser.getCpuLoad())
+
+        # plot graphs here no matplot lib on LINSEE
+        #import matplotlib.pyplot as plt
+        #import numpy
+        #per_data=numpy.genfromtxt('pdcpthroughput.csv',delimiter=',')
+        #plt.xlabel ('time')
+        #plt.ylabel ('throughput in kbps')
         
-    #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
-    #       -> need to understand logs stats
-    parser=Parser()
-    parser.read()
-
-    createCsvThroughput('PDCP',parser.getPDCPThroughput())
-    createCsvThroughput('RLC',parser.getRLCThroughput())
-    createCsvThroughput('MAC',parser.getMACThroughput())
-
-    createCsvLoad(parser.getCpuLoad())
-
-    # plot graphs here no matplot lib on LINSEE
-    #import matplotlib.pyplot as plt
-    #import numpy
-    #per_data=numpy.genfromtxt('pdcpthroughput.csv',delimiter=',')
-    #plt.xlabel ('time')
-    #plt.ylabel ('throughput in kbps')
-    
-    #for core in throughput:
-    #    plt.title('PDCP throughput')
-    #    print throughput[core]
-    #    time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
-    #    value= [x[1] for x in throughput[core]]
-    #    print time
-    #    print value
-    #    plt.plot(time,value,label=core)
-    #plt.show()
+        #for core in throughput:
+        #    plt.title('PDCP throughput')
+        #    print throughput[core]
+        #    time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
+        #    value= [x[1] for x in throughput[core]]
+        #    print time
+        #    print value
+        #    plt.plot(time,value,label=core)
+        #plt.show()
 
 
 def createCsv(name,type,data):
