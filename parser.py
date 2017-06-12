@@ -16,13 +16,13 @@ class ProgressBar:
         self.maxbar = maxbar
         self.title  = title
     
-    def update(self, val, seconds):
+    def update(self, val, time):
         import sys
         perc  = int(round((float(val) / float(self.valmax)) * 100))
         scale = 100.0 / float(self.maxbar)
         bar   = int(perc / scale)
   
-        out = '\r{0}  {1:>3}% [{2}{3}] {4:>6}/{5:>6}   | ETA: {6:}s'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,seconds)
+        out = '\r{0}  {1:>3}% [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
         sys.stdout.write(out)
         sys.stdout.flush()
 
@@ -58,7 +58,8 @@ class Parser:
         self.pdcpthroughput = {}
         self.rlcthroughput  = {}
         self.macthroughput  = {}
-        # warning : sort self.files depending on filename timestamp
+        
+        totalTime = datetime.now() 
         for filename in self.files:
             if ( re.search(r'.*udplog_.*',filename) ):
                 print "\nread filename : " + filename
@@ -69,10 +70,7 @@ class Parser:
                     for line in f:
                         lineNumber=lineNumber+1
                         if (lineNumber%250==0):
-                            delta = datetime.now() - d
-                            d = datetime.now()
-                            seconds = int(delta.total_seconds())
-                            Bar.update(lineNumber,seconds)
+                            Bar.update(lineNumber,datetime.now() - d)
 
                         # CPU load
                         cpuload.read()
@@ -112,12 +110,12 @@ class Parser:
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
-                    delta = datetime.now() - d
-                    d = datetime.now()
-                    seconds = int(delta.total_seconds())
-                    Bar.update(lineNumber,seconds)
+                    Bar.update(lineNumber,datetime.now() - d)
         cpuloadcsv.close()
-        print "\n"
+        print "\n"+'  +'+'-'*110 + '+'
+        totalTime = datetime.now() - totalTime
+        print "  total time: {0:}:{1:02d}:{2:02d}.{3:03d}\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+        
 
     def getPDCPThroughput(self):
         return self.pdcpthroughput
@@ -127,6 +125,9 @@ class Parser:
 
     def getMACThroughput(self):
         return self.macthroughput
+
+    def getCpuLoad(self):
+        return self.cpuload
 
 
 
@@ -192,10 +193,10 @@ def main(argv):
     # check all files in results folder
     import os
 
-    path = "/home/quentin/Python/Parser/results"
+    #path = "/home/quentin/Python/Parser/results"
     user = os.environ['USER']
     #user = os.getlogin()
-    #path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "path=" + path
     #files = [path+"/"+filename for filename in os.listdir(path)]
     for dirpath, dirnames, filenames in os.walk(path):
@@ -217,8 +218,14 @@ def main(argv):
         if ( re.search(r'.*udplog_.*',filename) ):
             udplognb=udplognb+1
     print "number of udplog files in path: {}".format(udplognb)
-#from logs:
-    ## 1/check board type
+
+    directory='csv'
+    if os.path.exists(directory):
+        import shutil
+        shutil.rmtree(directory)
+    os.makedirs(directory)
+
+    ## check board type and deployment from startup log
     cloud = False
     for filename in settings.files:
         if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
@@ -231,56 +238,50 @@ def main(argv):
                     if (m): deployment = m.group(1)
             break
                         
-
-    print '\033[1m'
-    print '+'+'-'*60+'+'
+    print '\033[1m'+'+'+'-'*60+'+'
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
     if (cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
-    print '+'+'-'*60+'+'
-    print '\033[0m'
-
-    ## 2/check deployment
-
-    # parse cpu load data
-    #cpuload = CpuLoad()
-    #cpuload.read()
-    #cpuload.dump()
+    print '+'+'-'*60+'+' + '\033[0m'
 
     #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
     #       -> need to understand logs stats
     parser=Parser()
     parser.read()
-    print "\n"
 
-    throughput = parser.getPDCPThroughput()
-    pdcpthoughput =  open('pdcpthroughput.csv','w')
-    pdcpthroughputwriter = csv.writer(pdcpthoughput)
-    pdcpthroughputwriter.writerow(['timestamp','core','PDCP throughput in kbps'])
+    createCsv('PDCP',parser.getPDCPThroughput())
+    createCsv('RLC',parser.getRLCThroughput())
+    createCsv('MAC',parser.getMACThroughput())
 
-    for line in throughput:
-        pdcpthroughputwriter.writerow(line)
-
-    pdcpthoughput.close()
-    
+    createCsv('CpuLoad',parser.getCpuLoad())
 
     # plot graphs here no matplot lib on LINSEE
-    import matplotlib.pyplot as plt
-    import numpy
+    #import matplotlib.pyplot as plt
+    #import numpy
     #per_data=numpy.genfromtxt('pdcpthroughput.csv',delimiter=',')
-    plt.xlabel ('time')
-    plt.ylabel ('throughput in kbps')
+    #plt.xlabel ('time')
+    #plt.ylabel ('throughput in kbps')
     
+    #for core in throughput:
+    #    plt.title('PDCP throughput')
+    #    print throughput[core]
+    #    time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
+    #    value= [x[1] for x in throughput[core]]
+    #    print time
+    #    print value
+    #    plt.plot(time,value,label=core)
+    #plt.show()
+
+def createCsv(layerName,data):
+    throughput = data
     for core in throughput:
-        plt.title('PDCP throughput')
-        print throughput[core]
-        time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
-        value= [x[1] for x in throughput[core]]
-        print time
-        print value
-        plt.plot(time,value,label=core)
-    plt.show()
+        fd = open('csv/{}throughput_{}.csv'.format(layerName,core),'w')
+        writer = csv.writer(fd)
+        writer.writerow(['timestamp','{} throughput in kbps for core {}'.format(layerName,core)])
+        for line in throughput[core]:
+            writer.writerow(line)
+        fd.close()
 
 if __name__ == "__main__":
     settings.init()
