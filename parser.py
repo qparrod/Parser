@@ -115,9 +115,8 @@ class Parser:
                         # CBitrate:: ... Kilobits pers second on CellId.. 
                     Bar.update(lineNumber,datetime.now() - d)
         cpuloadcsv.close()
-        print "\n"+'   -'+'-'*108 + '+'
         totalTime = datetime.now() - totalTime
-        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+        print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
         
 
     def getPDCPThroughput(self):
@@ -171,8 +170,10 @@ def main(argv):
     board='fsm3'
     deployment = 'cloud fsm3 6dsp'
     graphAllowed = False
+    workPathNeeded = False
+    branch = ''
     try:
-        opts, args = getopt.getopt(argv,"ghi:a:b:",["application=","board="])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:",["application=","board=","wcpy="])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -183,6 +184,9 @@ def main(argv):
             sys.exit()
         elif opt == '-g':
             graphAllowed = True
+        elif opt in ('-w','--wcpy'):
+            workPathNeeded = True
+            branch = arg
         elif opt in ("-i", "--ifile"):
             inputfile = arg
         elif opt in ("-a", "--application"):
@@ -198,23 +202,31 @@ def main(argv):
     
     # check all files in results folder
     import os
-    #path = "/home/quentin/Python/Parser/results"
-    user = os.environ['USER']
-    #user = os.getlogin()
-    path = "/var/fpwork/"+ str(user) + "/FTL2/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    if not workPathNeeded:
+        path = "/home/quentin/Python/Parser/results"
+    else:
+        user = os.getlogin()
+        path = "/var/fpwork/"+ str(user) + "/"+branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "path=" + path
-    #files = [path+"/"+filename for filename in os.listdir(path)]
+
+    import sys
+    if sys.version_info < (2,7):
+        print '\033[91m'+ 'must use python 2.7 or greater'
+        print 'possible solution: use "seesetenv LINSEE_BTS-5.7.0" command' + '\033[0m'
+        exit()
+
     for dirpath, dirnames, filenames in os.walk(path):
         if(dirnames!=[]):
             emTrace='activated'
             emTraceFolderName = dirnames[0]
         settings.files = [os.path.join(dirpath,name) for name in filenames]
         break
-    
-    print "number of files in path: {}".format(len(settings.files))
-    if (len(settings.files)==0):
+   
+    nofiles = len(settings.files) 
+    if (nofiles==0):
         print '\033[91m' + "no file in path" + '\033[0m'
         exit();
+    print "number of files in path: {0}".format(nofiles)
 
     settings.files.sort()
 
