@@ -23,9 +23,9 @@ class ProgressBar:
         bar   = int(perc / scale)
  
         if (perc!=100): 
-            out = '\r{0} \033[1m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
+            out = '\r{0} \033[1m {1:>3}%\033[0m [{2}{3}] time: {4:}:{5:02d}:{6:02d}.{7:03d}'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
         else:
-            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] {4:>6}/{5:>6}    |   time: {6:}:{7:02d}:{8:02d}.{9:03d}  |'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),val,self.valmax,time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
+            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] time: {4:}:{5:02d}:{6:02d}.{7:03d}'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
         sys.stdout.write(out)
         sys.stdout.flush()
 
@@ -51,6 +51,7 @@ class Parser:
     def read(self):
         rlcpacket  = RlcPacket()
         pdcppacket = PdcpPacket()
+        macpacket = MacPacket()
         cpuload    = CpuLoad()
 
         cpuloadcsv = open('cpuload.csv','w')
@@ -72,7 +73,7 @@ class Parser:
                     lineNumber=0
                     for line in f:
                         lineNumber=lineNumber+1
-                        if (lineNumber%250==0):
+                        if (lineNumber%2000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
                         # CPU load
@@ -110,6 +111,15 @@ class Parser:
                             self.rlcthroughput[core].append((timestamp,val3*8/2.0/1024))
 
                         # MAC
+                        macpacket.readReceivedData()
+                        values = self.search(macpacket,line)
+                        if(values!=()):
+			    (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
+                            if (ueGroup == '0'):
+                                if core not in self.macthroughput:
+                                    self.macthroughput[core] = []
+                                self.macthroughput[core].append((timestamp,int(receivedData)*8/2.0/1024))
+                        
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -314,8 +324,8 @@ def main(argv):
 
 
 def createCsv(name,type,data):
-    throughput = data
-    for core in throughput:
+    if name=='MAC': print data
+    for core in data:
         directory = ''
         header= []
         if (type=="throughput"):
@@ -330,7 +340,7 @@ def createCsv(name,type,data):
         fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
         writer = csv.writer(fd)
         writer.writerow(header)
-        for line in throughput[core]:
+        for line in data[core]:
             writer.writerow(line)
         fd.close()
 
