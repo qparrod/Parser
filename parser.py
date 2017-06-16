@@ -299,27 +299,46 @@ def main(argv):
         h_box_origin = 0
         box_space = 0
     
-        while(v_box_origin+v_box<v_max):
-            scr = curses.newwin(v_box,h_box,v_box_origin,h_box_origin)
-            scr.border('|','|','_','_','|','|','|','|')
-            scr_boxes.append(scr)
-            v_box_origin += v_box + box_space -1
-        
-        for scr in scr_boxes:
-            scr.refresh()
-        scr_boxes[-1].getch()
+        #while(v_box_origin+v_box<v_max):
+        #    scr = curses.newwin(v_box,h_box,v_box_origin,h_box_origin)
+        #    scr.border('|','|','_','_','|','|','|','|')
+        #    scr_boxes.append(scr)
+        #    v_box_origin += v_box + box_space -1
+       # 
+       # for scr in scr_boxes:
+        #   scr.refresh()
+        #scr_boxes[-1].getch()
 
         screen.clear()
         screen.border('|','|','-','-','+','+','+','+')
-        #get max size of window
         h_size = h_max-x_limit-x_origin-1
         v_size = v_max-y_limit-y_origin-1
         screen.addstr(1,20,"Trace throughput ({},{}) ".format(v_max,h_max))
         screen.addstr(y_origin,x_origin,'^')
         screen.vline(y_origin+1,x_origin,'|',v_size)
-        screen.addstr(y_origin+v_size,x_origin,'+')
-        screen.hline(y_origin+v_size,x_origin+1,'-',h_size)
+        screen.addstr(y_origin+v_size,x_origin,'|')
+        screen.hline(y_origin+v_size,x_origin+1,'_',h_size)
         screen.addstr(y_origin+v_size,x_origin+h_size,'>')
+        hlegend='time'
+        vlegend='throughput in kbps'
+        screen.addstr(y_origin+v_size+1,x_origin+h_size-len(hlegend),hlegend)
+        screen.addstr(y_origin,x_origin+1,vlegend)
+        
+        #update screen with data
+        ex = [100,0.0,0.0,2.67,30.2,101.89,150.12,152.10,120,178,177,177,177.1,177.2,177.3,140.5,110.78,20.2,0.0,0.0,0.0]
+        t  = range(len(ex))
+        data = zip(ex,t)
+        vstep = float((max(ex)-min(ex))/v_size)
+        hstep = float(((max(t)-min(t))*1000)/h_size)
+
+        i=0
+        for (e,time) in data:
+            xpos=0
+            ypos = int(e / vstep )
+            if (hstep != 0.0):
+                xpos = int(time*1000/hstep)
+            screen.addstr(y_origin+v_size-ypos,x_origin+xpos,'+')
+        
         screen.refresh()
         screen.getch()
         
