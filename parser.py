@@ -280,66 +280,52 @@ def main(argv):
     print '+'+'-'*60+'+' + '\033[0m'
 
     if (graphAllowed):
-
-        from os import system
         import curses
 
-        def get_param(prompt_string):
-             screen.clear()
-             screen.border(0)
-             screen.addstr(2, 2, prompt_string)
-             screen.refresh()
-             input = screen.getstr(10, 10, 60)
-             return input
-
-        def execute_cmd(cmd_string):
-             system("clear")
-             a = system(cmd_string)
-             print ""
-             if a == 0:
-                  print "Command executed correctly"
-             else:
-                  print "Command terminated with error"
-             raw_input("Press enter")
-             print ""
-
-        x = 0
-
-        while x != ord('Q'):
-             screen = curses.initscr()
-
-             screen.clear()
-             screen.border(0)
-             screen.addstr(2, 2, "Please enter a number...")
-             screen.addstr(4, 4, "1 - Throughput")
-             screen.addstr(5, 4, "2 - CPU load")
-             screen.addstr(7, 4, "Q - Exit")
-             screen.refresh()
-
-             x = screen.getch()
-
-             if x == ord('1'):
-                 selectedLayer = get_param("Enter the layer (PDCP, RLC, MAC)")
-                 selectedCore  = get_param("Enter the core (UeVM,CellVM,1233)")
-                 curses.endwin()
-                 #execute_cmd("useradd -d " + homedir + " -g 1000 -G " + groups + " -m -s " + shell + " " + username)
-             if x == ord('2'):
-                 selectedCore = get_param("Enter the core (UeVM,CellVM,1233)")
-                 curses.endwin()
-                 #execute_cmd("apachectl restart")
-             if x == ord('3'):
-                 curses.endwin()
-                 execute_cmd("df -h")
-             screen.refresh()
-             screen.clear()
-
-        curses.endwin()
-
+        print 'begin graph'
+        # begin curses application
         screen = curses.initscr()
-        screen.clear()
-        screen.border(1)
-        screen.vline(10,10,'|',100)
+        (v_max,h_max) = screen.getmaxyx()
+        x_origin = 10
+        x_limit = 4
+        y_origin = 2
+        y_limit = 5
 
+
+        v_box = 10
+        h_box = h_max
+        scr_boxes = []
+        v_box_origin = 0
+        h_box_origin = 0
+        box_space = 0
+    
+        while(v_box_origin+v_box<v_max):
+            scr = curses.newwin(v_box,h_box,v_box_origin,h_box_origin)
+            scr.border('|','|','_','_','|','|','|','|')
+            scr_boxes.append(scr)
+            v_box_origin += v_box + box_space -1
+        
+        for scr in scr_boxes:
+            scr.refresh()
+        scr_boxes[-1].getch()
+
+        screen.clear()
+        screen.border('|','|','-','-','+','+','+','+')
+        #get max size of window
+        h_size = h_max-x_limit-x_origin-1
+        v_size = v_max-y_limit-y_origin-1
+        screen.addstr(1,20,"Trace throughput ({},{}) ".format(v_max,h_max))
+        screen.addstr(y_origin,x_origin,'^')
+        screen.vline(y_origin+1,x_origin,'|',v_size)
+        screen.addstr(y_origin+v_size,x_origin,'+')
+        screen.hline(y_origin+v_size,x_origin+1,'-',h_size)
+        screen.addstr(y_origin+v_size,x_origin+h_size,'>')
+        screen.refresh()
+        screen.getch()
+        
+        # terminating curses application
+        curses.nocbreak(); screen.keypad(0); curses.echo(); curses.endwin()
+        print 'end graph'
     else:
 
         #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
