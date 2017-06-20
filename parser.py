@@ -115,7 +115,7 @@ class Parser:
                         macpacket.readReceivedData()
                         values = self.search(macpacket,line)
                         if(values!=()):
-			    (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
+                            (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
                             if (ueGroup == '0'):
                                 if core not in self.macthroughput:
                                     self.macthroughput[core] = []
@@ -291,104 +291,19 @@ def main(argv):
     if (graphAllowed):
         import time
         import datetime
-        #update screen with data
-        #ex = [100,0.0,0.0,2.67,30.2,101.89,150.12,152.10,120,178,177,177,177.1,177.2,177.3,140.5,110.78,20.2,0.0,0.0,0.0]
-        #t  = range(len(ex))
+
         data = parser.getPDCPThroughput()
-        print data
-        print time.mktime(datetime.datetime.strptime("2011-02-18T00:11:22.123456Z", "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
-        #ex = [pair[1] for pair in data]
-        #for core in data:
+
         ex = [ pair[1] for pair in data["LINUX-Disp_0"] ]
-
-        print ex
-        #for core in data:
-            #if (core=='FSP-1233'):
         t = [ time.mktime(datetime.datetime.strptime(pair[0], "%Y-%m-%dT%H:%M:%S.%fZ").timetuple()) for pair in data["LINUX-Disp_0"] ]
-        print t
-        data = zip(ex,t)
-        print "data dump:"
-        print data
 
-        import curses
-
-        print 'begin graph'
-        # begin curses application
-        screen = curses.initscr()
-        (v_max,h_max) = screen.getmaxyx()
-        x_origin = 10
-        x_limit = 4
-        y_origin = 2
-        y_limit = 5
-
-
-        v_box = 10
-        h_box = h_max
-        scr_boxes = []
-        v_box_origin = 0
-        h_box_origin = 0
-        box_space = 0
-    
-        #while(v_box_origin+v_box<v_max):
-        #    scr = curses.newwin(v_box,h_box,v_box_origin,h_box_origin)
-        #    scr.border('|','|','_','_','|','|','|','|')
-        #    scr_boxes.append(scr)
-        #    v_box_origin += v_box + box_space -1
-       # 
-       # for scr in scr_boxes:
-        #   scr.refresh()
-        #scr_boxes[-1].getch()
-
-        screen.clear()
-        screen.border('|','|','-','-','+','+','+','+')
-        h_size = h_max-x_limit-x_origin-1
-        v_size = v_max-y_limit-y_origin-1
-        screen.addstr(1,20,"Trace throughput ({},{}) ".format(v_max,h_max))
-        screen.addstr(y_origin,x_origin,'^')
-        screen.vline(y_origin+1,x_origin,'|',v_size)
-        screen.addstr(y_origin+v_size,x_origin,'|')
-        screen.hline(y_origin+v_size,x_origin+1,'_',h_size)
-        screen.addstr(y_origin+v_size,x_origin+h_size,'>')
-        hlegend='time'
-        vlegend='throughput in kbps'
-        screen.addstr(y_origin+v_size+1,x_origin+h_size-len(hlegend),hlegend)
-        screen.addstr(y_origin,x_origin+1,vlegend)
-
-        vstep = float((max(ex)-min(ex))/v_size)
-        hstep = float(((max(t)-min(t))*1000)/h_size)
-
-
-        xpos = 0
-        ypos = 0
-        for (e,time) in data:
-            xpos=xpos+1
-            ypos = int(e / vstep )
-
-            if (y_origin+v_size-ypos < v_max and x_origin+xpos < h_max):
-                screen.addstr(y_origin+v_size-ypos,x_origin+xpos,'+')
-            else:
-                screen.refresh()
-                screen.getch()
-                curses.nocbreak(); screen.keypad(0); curses.echo(); curses.endwin()
-                print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,h_max)
-                print v_max
-                print y_origin+v_size-ypos
-                print h_max
-                print x_origin+xpos
-                print "error exit"
-                exit()
-        
-        screen.refresh()
-        screen.getch()
-        
-        # terminating curses application
-        curses.nocbreak(); screen.keypad(0); curses.echo(); curses.endwin()
-        print 'end graph'
+        import graph
+        graph.draw(zip(ex,t))
 
 
 
 def createCsv(name,type,data):
-    if name=='MAC': print data
+    #if name=='MAC': print data
     for core in data:
         directory = ''
         header= []
