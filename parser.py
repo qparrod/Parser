@@ -279,7 +279,37 @@ def main(argv):
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
     print '+'+'-'*60+'+' + '\033[0m'
 
+    parser=Parser()
+    parser.read()
+
+    createCsvThroughput('PDCP',parser.getPDCPThroughput())
+    createCsvThroughput('RLC',parser.getRLCThroughput())
+    createCsvThroughput('MAC',parser.getMACThroughput())
+
+    createCsvLoad(parser.getCpuLoad())
+
     if (graphAllowed):
+        import time
+        import datetime
+        #update screen with data
+        #ex = [100,0.0,0.0,2.67,30.2,101.89,150.12,152.10,120,178,177,177,177.1,177.2,177.3,140.5,110.78,20.2,0.0,0.0,0.0]
+        #t  = range(len(ex))
+        data = parser.getPDCPThroughput()
+        print data
+        print time.mktime(datetime.datetime.strptime("2011-02-18T00:11:22.123456Z", "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
+        #ex = [pair[1] for pair in data]
+        #for core in data:
+        ex = [ pair[1] for pair in data["LINUX-Disp_0"] ]
+
+        print ex
+        #for core in data:
+            #if (core=='FSP-1233'):
+        t = [ time.mktime(datetime.datetime.strptime(pair[0], "%Y-%m-%dT%H:%M:%S.%fZ").timetuple()) for pair in data["LINUX-Disp_0"] ]
+        print t
+        data = zip(ex,t)
+        print "data dump:"
+        print data
+
         import curses
 
         print 'begin graph'
@@ -323,21 +353,30 @@ def main(argv):
         vlegend='throughput in kbps'
         screen.addstr(y_origin+v_size+1,x_origin+h_size-len(hlegend),hlegend)
         screen.addstr(y_origin,x_origin+1,vlegend)
-        
-        #update screen with data
-        ex = [100,0.0,0.0,2.67,30.2,101.89,150.12,152.10,120,178,177,177,177.1,177.2,177.3,140.5,110.78,20.2,0.0,0.0,0.0]
-        t  = range(len(ex))
-        data = zip(ex,t)
+
         vstep = float((max(ex)-min(ex))/v_size)
         hstep = float(((max(t)-min(t))*1000)/h_size)
 
-        i=0
+
+        xpos = 0
+        ypos = 0
         for (e,time) in data:
-            xpos=0
+            xpos=xpos+1
             ypos = int(e / vstep )
-            if (hstep != 0.0):
-                xpos = int(time*1000/hstep)
-            screen.addstr(y_origin+v_size-ypos,x_origin+xpos,'+')
+
+            if (y_origin+v_size-ypos < v_max and x_origin+xpos < h_max):
+                screen.addstr(y_origin+v_size-ypos,x_origin+xpos,'+')
+            else:
+                screen.refresh()
+                screen.getch()
+                curses.nocbreak(); screen.keypad(0); curses.echo(); curses.endwin()
+                print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,h_max)
+                print v_max
+                print y_origin+v_size-ypos
+                print h_max
+                print x_origin+xpos
+                print "error exit"
+                exit()
         
         screen.refresh()
         screen.getch()
@@ -345,35 +384,7 @@ def main(argv):
         # terminating curses application
         curses.nocbreak(); screen.keypad(0); curses.echo(); curses.endwin()
         print 'end graph'
-    else:
 
-        #TODO : read throughput on UeVm side (PDCP, RLC) to see bottlenecks
-        #       -> need to understand logs stats
-        parser=Parser()
-        parser.read()
-
-        createCsvThroughput('PDCP',parser.getPDCPThroughput())
-        createCsvThroughput('RLC',parser.getRLCThroughput())
-        createCsvThroughput('MAC',parser.getMACThroughput())
-
-        createCsvLoad(parser.getCpuLoad())
-
-        # plot graphs here no matplot lib on LINSEE
-        #import matplotlib.pyplot as plt
-        #import numpy
-        #per_data=numpy.genfromtxt('pdcpthroughput.csv',delimiter=',')
-        #plt.xlabel ('time')
-        #plt.ylabel ('throughput in kbps')
-        
-        #for core in throughput:
-        #    plt.title('PDCP throughput')
-        #    print throughput[core]
-        #    time= [datetime.strptime(x[0],'%Y-%m-%dT%H:%M:%S.%fZ') for x in throughput[core]]
-        #    value= [x[1] for x in throughput[core]]
-        #    print time
-        #    print value
-        #    plt.plot(time,value,label=core)
-        #plt.show()
 
 
 def createCsv(name,type,data):
