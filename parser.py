@@ -5,7 +5,7 @@ from layers import *
 from csvWriter import Csv
 import settings
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class ProgressBar:
@@ -95,9 +95,10 @@ class Parser:
                             [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
                             if core not in self.pdcpthroughput:
                                 self.pdcpthroughput[core] = []
-                            self.pdcpthroughput[core].append((timestamp,val1*8/2.0/1024))
-                            self.pdcpthroughput[core].append((timestamp,val2*8/2.0/1024))
-                            self.pdcpthroughput[core].append((timestamp,val3*8/2.0/1024))
+                            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            self.pdcpthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
+                            self.pdcpthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
+                            self.pdcpthroughput[core].append((t,val3*8/2.0/1024))
  
                         # RLC
                         rlcpacket.readRcvdRcvp()
@@ -158,8 +159,8 @@ class CpuLoad():
 
 
 class PoolStats(Parser):
-    def __init(self):
-        Parser.__init(self)
+    def __init__(self):
+        Parser.__init__(self)
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/EventPools: P: (\d+).*(\d*.?\d*)C: (\d+) LB: (\d+) L: (\d+) NB: (\d+).*(\d*).*(\d*).*(\d*).*(\d*).*(\d*)')  
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/SduPools: SRB:(\d+/\d+) SDU1:(\d+) SDU2:(\d+) .+ fully used:(\d*/\d*)')
 
@@ -279,6 +280,7 @@ def main(argv):
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
     print '+'+'-'*60+'+' + '\033[0m'
 
+
     parser=Parser()
     parser.read()
 
@@ -290,15 +292,16 @@ def main(argv):
 
     if (graphAllowed):
         import time
-        import datetime
+        import graph
+
+        g = graph.Graph()
 
         data = parser.getPDCPThroughput()
 
         ex = [ pair[1] for pair in data["LINUX-Disp_0"] ]
-        t = [ time.mktime(datetime.datetime.strptime(pair[0], "%Y-%m-%dT%H:%M:%S.%fZ").timetuple()) for pair in data["LINUX-Disp_0"] ]
+        t = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_0"] ]
 
-        import graph
-        graph.draw(zip(ex,t))
+        g.draw(zip(ex,t))
 
 
 
