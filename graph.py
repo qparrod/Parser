@@ -27,6 +27,11 @@ class Graph:
         self.screen.addstr(self.y_origin+self.v_size+2,int(0.5*(self.x_origin+self.h_size-len(xlegend))),xlegend)
         self.screen.addstr(self.y_origin+1,self.x_origin+2,ylegend)
 
+    def exit(self):
+        # terminating curses application
+        curses.nocbreak(); self.screen.keypad(0); curses.echo(); curses.endwin()
+
+
     def drawBoxes(self):
         v_box = 10
         h_box = h_max
@@ -44,6 +49,38 @@ class Graph:
         for scr in scr_boxes:
             scr.refresh()
         scr_boxes[-1].getch()
+
+    def drawBeautiful(self,data,data2):
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        self.exit()
+
+        absciss  = [pair[1] for pair in data] # eg time
+        ordinate = [pair[0] for pair in data] # value to plot
+
+        plt.plot(absciss,ordinate, 'b-')
+
+        #t = [time.strftime('%H:%M:%S',time.localtime(int(i))) for i in absciss]
+
+
+        import matplotlib.dates as mdates
+        #t = mdates.DateFormatter('%H:%M:%S')
+        plt.title('PDCP throughput')
+
+        absciss  = [pair[1] for pair in data2] # eg time
+        ordinate2 = [pair[0] for pair in data2] # value to plot
+
+        
+
+        plt.plot(absciss,ordinate2, 'g-')
+
+        print len(ordinate)
+        print len(ordinate2)
+        sumordinate = [ordinate[i]+ordinate2[i] for i in range(len(ordinate))]
+        plt.plot(absciss,sumordinate, 'r--')
+        plt.show()
+
 
 
     def draw(self,data):
@@ -86,7 +123,7 @@ class Graph:
             else:
                 self.screen.refresh()
                 self.screen.getch()
-                curses.nocbreak(); self.screen.keypad(0); curses.echo(); curses.endwin()
+                self.exit()
                 print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,self.h_max)
                 print v_max
                 print self.y_origin+self.v_size-ypos
@@ -98,7 +135,6 @@ class Graph:
         self.screen.refresh()
         self.screen.getch()
 
-        # terminating curses application
-        curses.nocbreak(); self.screen.keypad(0); curses.echo(); curses.endwin()
+        self.exit()
         print 'end graph'
         print "hstep={} vstep={}".format(hstep,vstep)

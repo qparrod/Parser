@@ -301,7 +301,10 @@ def main(argv):
         ex = [ pair[1] for pair in data["LINUX-Disp_0"] ]
         t = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_0"] ]
 
-        g.draw(zip(ex,t))
+        ex2 = [ pair[1] for pair in data["LINUX-Disp_1"] ]
+        t2 = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_1"] ]
+        #g.draw(zip(ex,t))
+        g.drawBeautiful(zip(ex,t),zip(ex2,t2))
 
 
 
