@@ -108,9 +108,10 @@ class Parser:
                             [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
                             if core not in self.rlcthroughput:
                                 self.rlcthroughput[core] = []
-                            self.rlcthroughput[core].append((timestamp,val1*8/2.0/1024))
-                            self.rlcthroughput[core].append((timestamp,val2*8/2.0/1024))
-                            self.rlcthroughput[core].append((timestamp,val3*8/2.0/1024))
+                            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                            self.rlcthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
+                            self.rlcthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
+                            self.rlcthroughput[core].append((t,val3*8/2.0/1024))
 
                         # MAC
                         macpacket.readReceivedData()
@@ -304,7 +305,7 @@ def main(argv):
         ex2 = [ pair[1] for pair in data["LINUX-Disp_1"] ]
         t2 = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_1"] ]
         #g.draw(zip(ex,t))
-        g.drawBeautiful(zip(ex,t),zip(ex2,t2))
+        g.drawBeautiful(zip(ex,t),zip(ex2,t2),parser.getRLCThroughput(),parser.getMACThroughput())
 
 
 

@@ -50,36 +50,42 @@ class Graph:
             scr.refresh()
         scr_boxes[-1].getch()
 
-    def drawBeautiful(self,data,data2):
-        import numpy as np
+    def drawBeautiful(self,data,data2,rlc,mac):
         import matplotlib.pyplot as plt
+        import matplotlib.dates as dt
 
         self.exit()
 
         absciss  = [pair[1] for pair in data] # eg time
         ordinate = [pair[0] for pair in data] # value to plot
 
-        plt.plot(absciss,ordinate, 'b-')
+        t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
+        dates = dt.date2num(t)
 
-        #t = [time.strftime('%H:%M:%S',time.localtime(int(i))) for i in absciss]
-
-
-        import matplotlib.dates as mdates
-        #t = mdates.DateFormatter('%H:%M:%S')
+        plt.figure(1)
+        plt.subplot(1,2,1)
+        plt.plot_date(dates,ordinate, 'b-', label='LINUX-Disp_0 throughput in kbps')
         plt.title('PDCP throughput')
-
         absciss  = [pair[1] for pair in data2] # eg time
-        ordinate2 = [pair[0] for pair in data2] # value to plot
-
-        
-
-        plt.plot(absciss,ordinate2, 'g-')
-
-        print len(ordinate)
-        print len(ordinate2)
+        ordinate2 = [pair[0] for pair in data2] # value to plot   
+        plt.plot_date(dates,ordinate2, 'g-',label='LINUX-Disp_1 throughput in kbps')
+        plt.xticks( rotation=25 )
         sumordinate = [ordinate[i]+ordinate2[i] for i in range(len(ordinate))]
-        plt.plot(absciss,sumordinate, 'r--')
+        plt.plot_date(dates,sumordinate, 'r--',label='total throughput in kbps')
+        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+
+        plt.subplot(2,2,2)
+        for core in rlc:
+            absciss = [ pair[1] for pair in rlc[core] ]
+            ordinate = [ time.mktime(pair[0].timetuple()) for pair in rlc[core] ]
+            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
+            dates = dt.date2num(t)
+            plt.plot_date(dates,ordinate, 'r--',label='core {} RLC throughput in kbps'.format(core))
+
         plt.show()
+
+        #plt.plotfile('csv/throughput/MAC_throughput_FSP-1233.csv',(0,1),linestyle="",marker="o")
+        #plt.show()
 
 
 
