@@ -118,10 +118,11 @@ class Parser:
                         values = self.search(macpacket,line)
                         if(values!=()):
                             (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
-                            if (ueGroup == '0'):
+                            if (ueGroup == '0'): #TODO : generalize this
                                 if core not in self.macthroughput:
                                     self.macthroughput[core] = []
-                                self.macthroughput[core].append((timestamp,int(receivedData)*8/2.0/1024))
+                                t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                                self.macthroughput[core].append((t,int(receivedData)*8/2.0/1024))
                         
 
                         #PHY stub

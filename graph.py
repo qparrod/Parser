@@ -4,6 +4,14 @@ import curses
 import time
 import datetime
 
+def convertTimestampFromStringToTime(timestampInString):
+    import datetime
+    pattern = "%Y-%m-%d %H:%M:%S.%f"
+    dt = datetime.datetime.strptime(timestampInString, pattern) # create a datetime
+    st = dt.timetuple() # create a time.struct_time
+    return time.mktime(st) # create a 9-tuple expressed time in local time
+
+
 class Graph:
     def __init__(self):
         self.screen = curses.initscr()
@@ -55,6 +63,7 @@ class Graph:
         import csv
         # TODO find core on available csv file
         pdcpcore = ['LINUX-Disp_0','LINUX-Disp_1']
+        self.data = {}
         for core in pdcpcore:
             with open('csv/throughput/PDCP_throughput_{}.csv'.format(core),'r') as csvfile:
                 r = csv.reader(csvfile, delimiter=',') 
@@ -72,7 +81,41 @@ class Graph:
     def getRlcData(self):
         import csv
         # TODO: find core on reading csv file available
-        rlccore = []
+        rlccore = ['FSP-1231','FSP-1232','FSP-1233','FSP-1234']
+        self.data = {}
+        for core in rlccore:
+            with open('csv/throughput/RLC_throughput_{}.csv'.format(core),'r') as csvfile:
+                r = csv.reader(csvfile, delimiter=',') 
+                self.data[core] = []
+                for row  in r:
+                    if len(row) != 2:
+                        print "wrong csv format"
+                        exit()
+                    # retrieve header
+                    if row[0] == 'timestamp':
+                        continue
+                    pair = (row[0],row[1])
+                    self.data[core].append(pair)
+
+    def getMacData(self):
+        import csv
+        # TODO: find core on reading csv file available
+        rlccore = ['FSP-1233','FSP-1253']
+        self.data = {}
+        for core in rlccore:
+            with open('csv/throughput/MAC_throughput_{}.csv'.format(core),'r') as csvfile:
+                r = csv.reader(csvfile, delimiter=',') 
+                self.data[core] = []
+                for row  in r:
+                    if len(row) != 2:
+                        print "wrong csv format"
+                        exit()
+                    # retrieve header
+                    if row[0] == 'timestamp':
+                        continue
+                    pair = (row[0],row[1])
+                    self.data[core].append(pair)
+        print self.data
 
     def drawPdcp(self):
         import matplotlib.dates as dt
@@ -92,7 +135,7 @@ class Graph:
         for core in self.data:
             #absciss = [pair[0] for pair in self.data[core]] # eg time
 
-            absciss = [ time.mktime(datetime.datetime.strptime(pair[0], "%Y-%m-%d %H:%M:%S.%f").timetuple()) for pair in self.data[core] ]
+            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
 
@@ -101,13 +144,75 @@ class Graph:
 
             plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
             plt.title('PDCP throughput')
-            plt.xticks( rotation=25 )
+            #plt.xticks( rotation=25 )
 
         plt.plot_date(dates,sumordinate, '--',label='total throughput in kbps')
         plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
 
     def drawRlc(self):
+        import matplotlib.dates as dt
+        import matplotlib.pyplot as plt
+
         self.getRlcData()
+
+        l = 0
+        for core in self.data:
+            if (l ==0 ):
+                l = len(self.data[core])
+            if (l!=0 and l!=len(self.data[core])):
+                print "values have not same size: {} != {}".format(l,len(self.data[core]))
+                exit()
+
+        sumordinate = [0] * l
+        for core in self.data:
+            #absciss = [pair[0] for pair in self.data[core]] # eg time
+
+            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
+            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
+            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
+
+            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
+            dates = dt.date2num(t)
+
+            plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
+            plt.title('RLC throughput')
+            #plt.xticks( rotation=25 )
+
+        plt.plot_date(dates,sumordinate, '--',label='total throughput in kbps')
+        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+
+    def drawMac(self):
+        import matplotlib.dates as dt
+        import matplotlib.pyplot as plt
+
+        self.getMacData()
+
+        l = 0
+        for core in self.data:
+            if (l ==0 ):
+                l = len(self.data[core])
+            if (l!=0 and l!=len(self.data[core])):
+                print "values have not same size: {} != {}".format(l,len(self.data[core]))
+                break #exit()
+
+        sumordinate = [0] * l
+        for core in self.data:
+            #absciss = [pair[0] for pair in self.data[core]] # eg time
+
+            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
+            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
+            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
+
+            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
+            dates = dt.date2num(t)
+
+            plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
+            plt.title('MAC throughput')
+            #plt.xticks( rotation=25 )
+
+        plt.plot_date(dates[:l],sumordinate, '--',label='total throughput in kbps')
+        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+
 
 
     def drawBeautiful(self):
@@ -116,23 +221,18 @@ class Graph:
 
         self.exit()
 
-        
-
-        plt.figure(1)
-        plt.subplot(1,2,1)
+        fig = plt.figure(1,figsize=(20,120))
+        plt.subplot(3,1,1)
         self.drawPdcp()
 
+        plt.subplot(3,1,2)
+        self.drawRlc()
         
+        plt.subplot(3,1,3)
+        self.drawMac()
 
-        '''
-        plt.subplot(2,2,2)
-        for core in rlc:
-            absciss = [ pair[1] for pair in rlc[core] ]
-            ordinate = [ time.mktime(pair[0].timetuple()) for pair in rlc[core] ]
-            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
-            dates = dt.date2num(t)
-            plt.plot_date(dates,ordinate, 'r--',label='core {} RLC throughput in kbps'.format(core))
-        '''
+        fig.savefig('throughput.png', dpi=100)
+
         plt.show()
 
 
