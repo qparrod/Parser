@@ -177,7 +177,7 @@ def usage():
 
 
 def main(argv):
-    
+    ResultFolderAlreadyRead = False
     inputfile=''
     application='syslogAnalyzer'
     board='fsm3'
@@ -243,69 +243,81 @@ def main(argv):
 
     settings.files.sort()
 
-    udplognb = 0
-    for filename in settings.files:
-        if ( re.search(r'.*udplog_.*',filename) ):
-            udplognb=udplognb+1
-    print "number of udplog files in path: {}".format(udplognb)
+    if (os.path.isfile('fileHistory.txt')):
+        fileHistory = open('fileHistory.txt','r')
+        print "open history files"
+        ResultFolderAlreadyRead = True
+        for line in fileHistory:
+            line = line.rstrip('\n')
+            found = False
+            for e in settings.files:
+                if line == e:
+                    found = True;
+                    break
+            if(not found):
+                ResultFolderAlreadyRead = False
 
-    csvDirectory='csv'
-    directory=csvDirectory
-    if os.path.exists(directory):
-        import shutil
-        shutil.rmtree(directory)
-    os.makedirs(directory)
+        fileHistory.close()
 
-    throughputDirectory='throughput'
-    cpuloadDirectory='cpuload'
-    os.makedirs(directory+'/'+throughputDirectory)
-    os.makedirs(directory+'/'+cpuloadDirectory)
-
-    ## check board type and deployment from startup log
-    cloud = False
-    for filename in settings.files:
-        if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
-            with open(filename,'r') as f:
-                for line in f:
-                    if(re.search(r'VM-\d+.+',line)): cloud=True
-                    m = re.search(r'Detected module (.*) and',line)
-                    if (m): board = m.group(1)
-                    m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
-                    if (m): deployment = m.group(1)
-            break
-                        
-    print '\033[1m'+'+'+'-'*60+'+'
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
-    if (cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
-    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
-    print '+'+'-'*60+'+' + '\033[0m'
+    print "Result already read: {}".format(ResultFolderAlreadyRead)
 
 
-    parser=Parser()
-    parser.read()
+    if not ResultFolderAlreadyRead : 
+        fileHistory = open('fileHistory.txt','w')
+        udplognb = 0
+        for filename in settings.files:
+            if ( re.search(r'.*udplog_.*',filename) ):
+                udplognb=udplognb+1
+                fileHistory.write(filename+'\n')
+        print "number of udplog files in path: {}".format(udplognb)
 
-    createCsvThroughput('PDCP',parser.getPDCPThroughput())
-    createCsvThroughput('RLC',parser.getRLCThroughput())
-    createCsvThroughput('MAC',parser.getMACThroughput())
+    
+        csvDirectory='csv'
+        directory=csvDirectory
+        if os.path.exists(directory):
+            import shutil
+            shutil.rmtree(directory)
+        os.makedirs(directory)
 
-    createCsvLoad(parser.getCpuLoad())
+        throughputDirectory='throughput'
+        cpuloadDirectory='cpuload'
+        os.makedirs(directory+'/'+throughputDirectory)
+        os.makedirs(directory+'/'+cpuloadDirectory)
+
+        ## check board type and deployment from startup log
+        cloud = False
+        for filename in settings.files:
+            if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
+                with open(filename,'r') as f:
+                    for line in f:
+                        if(re.search(r'VM-\d+.+',line)): cloud=True
+                        m = re.search(r'Detected module (.*) and',line)
+                        if (m): board = m.group(1)
+                        m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
+                        if (m): deployment = m.group(1)
+                break
+                            
+        print '\033[1m'+'+'+'-'*60+'+'
+        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
+        if (cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
+        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
+        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
+        print '+'+'-'*60+'+' + '\033[0m'
+
+
+        parser=Parser()
+        parser.read()
+
+        createCsvThroughput('PDCP',parser.getPDCPThroughput())
+        createCsvThroughput('RLC',parser.getRLCThroughput())
+        createCsvThroughput('MAC',parser.getMACThroughput())
+
+        createCsvLoad(parser.getCpuLoad())
 
     if (graphAllowed):
-        import time
         import graph
-
         g = graph.Graph()
-
-        data = parser.getPDCPThroughput()
-
-        ex = [ pair[1] for pair in data["LINUX-Disp_0"] ]
-        t = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_0"] ]
-
-        ex2 = [ pair[1] for pair in data["LINUX-Disp_1"] ]
-        t2 = [ time.mktime(pair[0].timetuple()) for pair in data["LINUX-Disp_1"] ]
-        #g.draw(zip(ex,t))
-        g.drawBeautiful(zip(ex,t),zip(ex2,t2),parser.getRLCThroughput(),parser.getMACThroughput())
+        g.drawBeautiful()
 
 
 
