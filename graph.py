@@ -14,14 +14,8 @@ def convertTimestampFromStringToTime(timestampInString):
 
 class Graph:
     def __init__(self):
-        self.screen = curses.initscr()
-        self.x_origin = 10
-        self.y_origin = 2
-        self.x_limit = 4
-        self.y_limit = 5
-        (v_max,h_max) = self.screen.getmaxyx()
-        self.h_size = h_max-self.x_limit-self.x_origin-1
-        self.v_size = v_max-self.y_limit-self.y_origin-1
+        
+        
         self.data = {}
         self.layer = ''
 
@@ -60,13 +54,11 @@ class Graph:
             scr.refresh()
         scr_boxes[-1].getch()
 
-    def getPdcpData(self):
+    def getData(self):
         import csv
-        # TODO find core on available csv file
-        pdcpcore = ['LINUX-Disp_0','LINUX-Disp_1']
         self.data = {}
-        for core in pdcpcore:
-            with open('csv/throughput/PDCP_throughput_{}.csv'.format(core),'r') as csvfile:
+        for core in self.cores:
+            with open('csv/throughput/{}_throughput_{}.csv'.format(self.layer,core),'r') as csvfile:
                 r = csv.reader(csvfile, delimiter=',') 
                 self.data[core] = []
                 for row  in r:
@@ -78,46 +70,29 @@ class Graph:
                         continue
                     pair = (row[0],row[1])
                     self.data[core].append(pair)
+
+    def getPdcpData(self):
+        # TODO find core on available csv file
+        pdcpcore = ['LINUX-Disp_0','LINUX-Disp_1']
+        self.cores = pdcpcore
+        self.layer = 'PDCP'
+        self.getData()
 
 
     def getRlcData(self):
-        import csv
         # TODO: find core on reading csv file available
         rlccore = ['FSP-1231','FSP-1232','FSP-1233','FSP-1234']
-        self.data = {}
-        for core in rlccore:
-            with open('csv/throughput/RLC_throughput_{}.csv'.format(core),'r') as csvfile:
-                r = csv.reader(csvfile, delimiter=',') 
-                self.data[core] = []
-                for row  in r:
-                    if len(row) != 2:
-                        print "wrong csv format"
-                        exit()
-                    # retrieve header
-                    if row[0] == 'timestamp':
-                        continue
-                    pair = (row[0],row[1])
-                    self.data[core].append(pair)
+        self.cores = rlccore
+        self.layer = 'RLC'
+        self.getData()
 
     def getMacData(self):
-        import csv
         # TODO: find core on reading csv file available
-        rlccore = ['FSP-1233','FSP-1253']
-        self.data = {}
-        for core in rlccore:
-            with open('csv/throughput/MAC_throughput_{}.csv'.format(core),'r') as csvfile:
-                r = csv.reader(csvfile, delimiter=',') 
-                self.data[core] = []
-                for row  in r:
-                    if len(row) != 2:
-                        print "wrong csv format"
-                        exit()
-                    # retrieve header
-                    if row[0] == 'timestamp':
-                        continue
-                    pair = (row[0],row[1])
-                    self.data[core].append(pair)
-        print self.data
+        maccore = ['FSP-1233','FSP-1253']
+        self.cores = maccore
+        self.layer = 'MAC'
+        self.getData()
+        
 
     def drawPdcp(self):
         self.getPdcpData()
@@ -161,13 +136,15 @@ class Graph:
         plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
 
 
-    def drawBeautiful(self):
+    def drawFigure(self):
         import matplotlib.pyplot as plt
-        import datetime
 
-        self.exit()
+        mydpi = 50
 
-        fig = plt.figure(1,figsize=(20,120))
+        fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
+
+        #fig = plt.figure(1)
+
         plt.subplot(3,1,1)
         self.drawPdcp()
 
@@ -184,6 +161,18 @@ class Graph:
 
     def drawConsole(self,data):
         print 'begin graph'
+
+        self.screen = curses.initscr()
+
+        self.x_origin = 10
+        self.y_origin = 2
+        self.x_limit = 4
+        self.y_limit = 5
+        (v_max,h_max) = self.screen.getmaxyx()
+        self.h_size = h_max-self.x_limit-self.x_origin-1
+        self.v_size = v_max-self.y_limit-self.y_origin-1
+
+
         # begin curses application
         (v_max,h_max) = self.screen.getmaxyx()
 

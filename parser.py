@@ -48,6 +48,53 @@ class Parser:
         m = parserType.regex.search(_string)
         return (m.group(i+1) for i in range(parserType.count)) if m else ()
 
+    def getPdcpThroughput(self,pdcppacket,line):
+        pdcppacket.read()
+        values = self.search(pdcppacket,line)
+        if(values!=()):
+            (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
+            [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
+            if core not in self.pdcpthroughput:
+                self.pdcpthroughput[core] = []
+            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+            self.pdcpthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
+            self.pdcpthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
+            self.pdcpthroughput[core].append((t,val3*8/2.0/1024))
+
+    def getRlcThroughput(self,rlcpacket,line):
+        rlcpacket.readRcvdRcvp()
+        values = self.search(rlcpacket,line)
+        if(values!=()):
+            (core,timestamp,rcvd,rcvp,ackd,ackp)=values
+            [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
+            if core not in self.rlcthroughput:
+                self.rlcthroughput[core] = []
+            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+            self.rlcthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
+            self.rlcthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
+            self.rlcthroughput[core].append((t,val3*8/2.0/1024))
+
+    def getMacThroughput(self,macpacket,line):
+        macpacket.readReceivedData()
+        values = self.search(macpacket,line)
+        if(values!=()):
+            (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
+            if (ueGroup == '0'): #TODO : generalize this
+                if core not in self.macthroughput:
+                    self.macthroughput[core] = []
+                t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+                self.macthroughput[core].append((t,int(receivedData)*8/2.0/1024))
+
+    def getCpuLoadStats(self,cpuloadwriter,cpuload,line):
+        cpuload.read()
+        values = self.search(cpuload,line)
+        if(values!=()):
+            (core,timestamp,load,max)=values
+            if core not in self.cpuload:
+                self.cpuload[core] = []
+            self.cpuload[core].append((timestamp,float(load)))
+            cpuloadwriter.writerow([timestamp,core,load,max])
+
 
     def read(self):
         rlcpacket  = RlcPacket()
@@ -77,53 +124,10 @@ class Parser:
                         if (lineNumber%2000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
-                        # CPU load
-                        cpuload.read()
-                        values = self.search(cpuload,line)
-                        if(values!=()):
-                            (core,timestamp,load,max)=values
-                            if core not in self.cpuload:
-                                self.cpuload[core] = []
-                            self.cpuload[core].append((timestamp,float(load)))
-                            cpuloadwriter.writerow([timestamp,core,load,max])
-                          
-                        # PDCP
-                        pdcppacket.read()
-                        values = self.search(pdcppacket,line)
-                        if(values!=()):
-                            (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
-                            [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
-                            if core not in self.pdcpthroughput:
-                                self.pdcpthroughput[core] = []
-                            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-                            self.pdcpthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
-                            self.pdcpthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
-                            self.pdcpthroughput[core].append((t,val3*8/2.0/1024))
- 
-                        # RLC
-                        rlcpacket.readRcvdRcvp()
-                        values = self.search(rlcpacket,line)
-                        if(values!=()):
-                            (core,timestamp,rcvd,rcvp,ackd,ackp)=values
-                            [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
-                            if core not in self.rlcthroughput:
-                                self.rlcthroughput[core] = []
-                            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-                            self.rlcthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
-                            self.rlcthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
-                            self.rlcthroughput[core].append((t,val3*8/2.0/1024))
-
-                        # MAC
-                        macpacket.readReceivedData()
-                        values = self.search(macpacket,line)
-                        if(values!=()):
-                            (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
-                            if (ueGroup == '0'): #TODO : generalize this
-                                if core not in self.macthroughput:
-                                    self.macthroughput[core] = []
-                                t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-                                self.macthroughput[core].append((t,int(receivedData)*8/2.0/1024))
-                        
+                        self.getCpuLoadStats(cpuloadwriter,cpuload,line) # TODO delete cpuload writer and put in csv after getting values
+                        self.getPdcpThroughput(pdcppacket,line)
+                        self.getRlcThroughput(rlcpacket,line)
+                        self.getMacThroughput(macpacket,line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -318,7 +322,8 @@ def main(argv):
     if (graphAllowed):
         import graph
         g = graph.Graph()
-        g.drawBeautiful()
+        #g.drawConsole()
+        g.drawFigure()
 
 
 
