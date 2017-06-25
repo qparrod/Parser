@@ -22,10 +22,15 @@ class ProgressBar:
         scale = 100.0 / float(self.maxbar)
         bar   = int(perc / scale)
  
+        color = ''
+
         if (perc!=100): 
-            out = '\r{0} \033[1m {1:>3}%\033[0m [{2}{3}] time: {4:}:{5:02d}:{6:02d}.{7:03d}'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000)
+            color = '\033[1m'
         else:
-            out = '\r{0} \033[92m {1:>3}%\033[0m [{2}{3}] time: {4:}:{5:02d}:{6:02d}.{7:03d}'.format(self.title,perc,'='*bar,' ' * (self.maxbar - bar),time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
+            color = '\033[92m'
+
+        out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),
+            time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
 
         sys.stdout.write(out)
         sys.stdout.flush()
@@ -85,7 +90,7 @@ class Parser:
                 t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
                 self.macthroughput[core].append((t,int(receivedData)*8/2.0/1024))
 
-    def getCpuLoadStats(self,cpuloadwriter,cpuload,line):
+    def getCpuLoadStats(self,cpuload,line):
         cpuload.read()
         values = self.search(cpuload,line)
         if(values!=()):
@@ -93,7 +98,6 @@ class Parser:
             if core not in self.cpuload:
                 self.cpuload[core] = []
             self.cpuload[core].append((timestamp,float(load)))
-            cpuloadwriter.writerow([timestamp,core,load,max])
 
 
     def read(self):
@@ -101,10 +105,6 @@ class Parser:
         pdcppacket = PdcpPacket()
         macpacket = MacPacket()
         cpuload    = CpuLoad()
-
-        cpuloadcsv = open('cpuload.csv','w')
-        cpuloadwriter = csv.writer(cpuloadcsv)
-        cpuloadwriter.writerow(['timestamp','core','load','max'])
 
         self.cpuload        = {}
         self.pdcpthroughput = {}
@@ -124,7 +124,7 @@ class Parser:
                         if (lineNumber%2000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
-                        self.getCpuLoadStats(cpuloadwriter,cpuload,line) # TODO delete cpuload writer and put in csv after getting values
+                        self.getCpuLoadStats(cpuload,line)
                         self.getPdcpThroughput(pdcppacket,line)
                         self.getRlcThroughput(rlcpacket,line)
                         self.getMacThroughput(macpacket,line)
@@ -132,7 +132,6 @@ class Parser:
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
                     Bar.update(lineNumber,datetime.now() - d)
-        cpuloadcsv.close()
         totalTime = datetime.now() - totalTime
         print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
         
@@ -161,17 +160,11 @@ class CpuLoad():
         self.count = 4
 
 
-
-
-
 class PoolStats(Parser):
     def __init__(self):
         Parser.__init__(self)
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/EventPools: P: (\d+).*(\d*.?\d*)C: (\d+) LB: (\d+) L: (\d+) NB: (\d+).*(\d*).*(\d*).*(\d*).*(\d*).*(\d*)')  
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/SduPools: SRB:(\d+/\d+) SDU1:(\d+) SDU2:(\d+) .+ fully used:(\d*/\d*)')
-
-
-
 
 
 import sys
@@ -189,9 +182,10 @@ def main(argv):
     deployment = 'cloud fsm3 6dsp'
     graphAllowed = False
     workPathNeeded = False
+    console=False
     branch = ''
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:",["application=","board=","wcpy="])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cm",["application=","board=","wcpy="])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -217,6 +211,9 @@ def main(argv):
             if board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):
                 print "wrong board type: " + board
                 sys.exit()
+        elif opt == '-c':
+            console = True
+
     
     # check all files in results folder
     import os
@@ -322,8 +319,10 @@ def main(argv):
     if (graphAllowed):
         import graph
         g = graph.Graph()
-        #g.drawConsole()
-        g.drawFigure()
+        if console:
+            g.drawConsole()
+        else:
+            g.drawFigure()
 
 
 

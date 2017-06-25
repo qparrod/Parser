@@ -1,6 +1,5 @@
 #!/usr/bin/python2.7
 
-import curses
 import time
 import datetime
 
@@ -14,26 +13,16 @@ def convertTimestampFromStringToTime(timestampInString):
 
 class Graph:
     def __init__(self):
-        
-        
         self.data = {}
         self.layer = ''
 
-
-    def printAxes(self):
-        self.screen.addstr(self.y_origin,self.x_origin,'^')
-        self.screen.vline(self.y_origin+1,self.x_origin,'|',self.v_size)
-        self.screen.addstr(self.y_origin+self.v_size,self.x_origin,'|')
-        self.screen.hline(self.y_origin+self.v_size,self.x_origin+1,'_',self.h_size)
-        self.screen.addstr(self.y_origin+self.v_size,self.x_origin+self.h_size,'>')
-
-    def printLegend(self,xlegend,ylegend):
-        self.screen.addstr(self.y_origin+self.v_size+2,int(0.5*(self.x_origin+self.h_size-len(xlegend))),xlegend)
-        self.screen.addstr(self.y_origin+1,self.x_origin+2,ylegend)
-
     def exit(self):
-        # terminating curses application
-        curses.nocbreak(); self.screen.keypad(0); curses.echo(); curses.endwin()
+        import curses
+        curses.nocbreak()
+        self.screen.keypad(0)
+        curses.echo()
+        curses.endwin()
+        exit()
 
 
     def drawBoxes(self):
@@ -159,11 +148,54 @@ class Graph:
         plt.show()
 
 
-    def drawConsole(self,data):
-        print 'begin graph'
+    def printAxes(self):
+        self.screen.addstr(self.Y(self.v_size+1),self.X(0),'^')
+        self.screen.vline(self.Y(self.v_size-1),self.X(0),'|',self.v_size)
+        self.screen.addstr(self.y_origin+self.v_size,self.x_origin,'|')
+        self.screen.hline(self.y_origin+self.v_size,self.x_origin+1,'_',self.h_size)
+        self.screen.addstr(self.y_origin+self.v_size,self.x_origin+self.h_size,'>')
 
-        self.screen = curses.initscr()
+    def printLegend(self,xlegend,ylegend):
+        self.screen.addstr(self.y_origin+self.v_size+2,int(0.5*(self.x_origin+self.h_size-len(xlegend))),xlegend)
+        self.screen.addstr(self.y_origin+1,self.x_origin+2,ylegend)
 
+    def X(self,x):
+        X = int(self.x_origin + x)
+        (Ymax,Xmax) = self.screen.getmaxyx()
+        if X > Xmax or X < 0:
+            print "invalid conversion from x={} to X={} -> max={}".format(x,X,Xmax)
+            self.exit()
+        return X
+
+    def Y(self,y):
+        Y = int(self.y_origin + self.v_size - y)
+        (Ymax,Xmax) = self.screen.getmaxyx()
+        if Y > Ymax or Y < 0:
+            print "invalid conversion from y={} to Y={} -> max={}".format(y,Y,Ymax)
+            self.exit()
+        return Y
+
+    def convertCoord(self,x,y):
+        return (self.X(x),self.Y(y))
+
+    def convertCoordList(self,list_x, list_y):
+        coord_list = zip(list_x,list_y)
+        return [(self.X(x),self.Y(y)) for x,y in coord_list]
+
+    def printXRange(self,min,max):
+        mintime = time.strftime('%H:%M:%S',time.localtime(min))
+        #mindate = datetime.datetime.fromtimestamp(int(min(absciss)))
+        #mintime = mindate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        self.screen.addstr(self.Y(-1),self.X(0),mintime)
+
+        maxtime = time.strftime('%H:%M:%S',time.localtime(max))
+        self.screen.addstr(self.Y(-1),self.X(self.h_size-len(maxtime)),maxtime)
+
+    def printYRange(self,min,max):
+        self.screen.addstr(self.Y(self.v_size),self.X(-1-len(str(int(max)))), str(int(max)))
+        self.screen.addstr(self.Y(0)          ,self.X(-1-len(str(int(min)))), str(int(min)))
+
+    def consoleInit(self):
         self.x_origin = 10
         self.y_origin = 2
         self.x_limit = 4
@@ -172,57 +204,108 @@ class Graph:
         self.h_size = h_max-self.x_limit-self.x_origin-1
         self.v_size = v_max-self.y_limit-self.y_origin-1
 
+    def drawConsole(self):
+        import curses
 
-        # begin curses application
+        self.screen = curses.initscr()
+        curses.start_color()
+        self.consoleInit()
+
         (v_max,h_max) = self.screen.getmaxyx()
 
         self.screen.clear()
         self.screen.border('|','|','-','-','+','+','+','+')
         
-        self.screen.addstr(1,20,"Trace throughput ({},{}) ".format(v_max,h_max))
+        self.screen.addstr(1,20,"PDCP throughput ({},{}) ".format(v_max,h_max))
 
         self.printAxes()
         self.printLegend('time','throughput in kbps')
+
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
         
-        absciss  = [pair[1] for pair in data] # eg time
-        ordinate = [pair[0] for pair in data] # value to plot
-        vstep = float((max(ordinate)-min(ordinate))/self.v_size)
-        hstep = float((max(absciss)-min(absciss))/self.h_size)
+        self.getPdcpData()
 
-        self.screen.addstr(self.y_origin,self.x_origin-len(str(int(max(ordinate))))-1,str(int(max(ordinate))))
-        self.screen.addstr(self.y_origin+self.v_size,self.x_origin-len(str(int(min(ordinate))))-1,str(int(min(ordinate))))
 
-        mintime = time.strftime('%H:%M:%S',time.localtime(int(min(absciss))))
-        mindate = datetime.datetime.fromtimestamp(int(min(absciss)))
-        mintime = mindate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        self.screen.addstr(self.y_origin+self.v_size+1,self.x_origin,mintime)
-        maxtime = time.strftime('%H:%M:%S',time.localtime(int(max(absciss))))
-        self.screen.addstr(self.y_origin+self.v_size+1,self.x_origin+self.h_size-len(maxtime),maxtime)
-
-        xpos = 0    
-        ypos = 0
-        for (e,t) in data:
-            #xpos=xpos+1
-            xpos = int((t - min(absciss)) / hstep)
-            ypos = int((e - min(ordinate)) / vstep )
-
-            if (self.y_origin+self.v_size-ypos < v_max and self.x_origin+xpos < h_max):
-                self.screen.addstr(self.y_origin+self.v_size-ypos,self.x_origin+xpos,'+')
-            else:
-                self.screen.refresh()
-                self.screen.getch()
+        # initialize list of sum of values
+        l = 0
+        for core in self.data:
+            if (l ==0 ):
+                l = len(self.data[core])
+            if (l!=0 and l!=len(self.data[core])):
+                print "values have not same size: {} != {}".format(l,len(self.data[core]))
                 self.exit()
-                print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,self.h_max)
-                print v_max
-                print self.y_origin+self.v_size-ypos
-                print h_max
-                print self.x_origin+xpos
-                print "error exit"
-                exit()
+        sumordinate = [0] * l
+
+
+        i=0
+
+        # Calculate time to print in console
+        import sys
+        hmax = 0
+        hmin = sys.maxint
+        vmax=0
+        vmin= sys.maxint
+        for core in self.data:
+            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # timestamps
+            ordinate = [float(pair[1]) for pair in self.data[core]] # values to plot
+            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
+            hmin = min(hmin,min(absciss))
+            hmax = max(hmax,max(absciss))
+            vmin = min(vmin,min(ordinate))
+            vmax = max(vmax,max(sumordinate))
+        hstep = float((hmax-hmin)/self.h_size)
+        vstep = float((vmax-vmin)/self.v_size)
+
+        # print ranges
+        self.printYRange(vmin,vmax)
+        self.printXRange(hmin,hmax)
+
+
+        for core in self.data:
+            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # time
+            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
+
+
+
+            '''
+            xpos = 0    
+            ypos = 0
+            i=i+1
+            for (t,e) in self.data[core]:
+                t = convertTimestampFromStringToTime(t)
+                e = float(e)
+                #xpos=xpos+1
+                xpos = int((t - min(absciss)) / hstep)
+                ypos = int((e - min(ordinate)) / vstep )
+
+                if (self.y_origin+self.v_size-ypos < v_max and self.x_origin+xpos < h_max):
+                    self.screen.addstr(self.y_origin+self.v_size-ypos,self.x_origin+xpos,'+',curses.color_pair(i))
+                else:
+                    self.screen.refresh()
+                    self.screen.getch()
+                    self.exit()
+                    print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,self.h_max)
+                    print v_max
+                    print self.y_origin+self.v_size-ypos
+                    print h_max
+                    print self.x_origin+xpos
+                    print "error exit"
+                    exit()
+            '''
+
+        # print sum
+        sum = zip(absciss,sumordinate)
+        for x,y in sum:
+            xpos = int((x - min(absciss)) / hstep)
+            ypos = int((y - min(sumordinate)) / vstep )
+            self.screen.addstr(self.Y(ypos),self.X(xpos),'*')
 
         self.screen.refresh()
         self.screen.getch()
 
-        self.exit()
-        print 'end graph'
-        print "hstep={} vstep={}".format(hstep,vstep)
+        #self.exit()
+        curses.nocbreak()
+        self.screen.keypad(0)
+        curses.echo()
+        curses.endwin()
