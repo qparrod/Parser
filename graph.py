@@ -23,6 +23,7 @@ class Graph:
         self.h_size = h_max-self.x_limit-self.x_origin-1
         self.v_size = v_max-self.y_limit-self.y_origin-1
         self.data = {}
+        self.layer = ''
 
 
     def printAxes(self):
@@ -78,6 +79,7 @@ class Graph:
                     pair = (row[0],row[1])
                     self.data[core].append(pair)
 
+
     def getRlcData(self):
         import csv
         # TODO: find core on reading csv file available
@@ -118,75 +120,23 @@ class Graph:
         print self.data
 
     def drawPdcp(self):
-        import matplotlib.dates as dt
-        import matplotlib.pyplot as plt
-
         self.getPdcpData()
-
-        l = 0
-        for core in self.data:
-            if (l ==0 ):
-                l = len(self.data[core])
-            if (l!=0 and l!=len(self.data[core])):
-                print "values have not same size"
-                exit()
-
-        sumordinate = [0] * l
-        for core in self.data:
-            #absciss = [pair[0] for pair in self.data[core]] # eg time
-
-            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
-            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
-            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
-
-            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
-            dates = dt.date2num(t)
-
-            plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
-            plt.title('PDCP throughput')
-            #plt.xticks( rotation=25 )
-
-        plt.plot_date(dates,sumordinate, '--',label='total throughput in kbps')
-        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+        self.layer = 'PDCP'
+        self.draw()
 
     def drawRlc(self):
-        import matplotlib.dates as dt
-        import matplotlib.pyplot as plt
-
         self.getRlcData()
-
-        l = 0
-        for core in self.data:
-            if (l ==0 ):
-                l = len(self.data[core])
-            if (l!=0 and l!=len(self.data[core])):
-                print "values have not same size: {} != {}".format(l,len(self.data[core]))
-                exit()
-
-        sumordinate = [0] * l
-        for core in self.data:
-            #absciss = [pair[0] for pair in self.data[core]] # eg time
-
-            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
-            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
-            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
-
-            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
-            dates = dt.date2num(t)
-
-            plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
-            plt.title('RLC throughput')
-            #plt.xticks( rotation=25 )
-
-        plt.plot_date(dates,sumordinate, '--',label='total throughput in kbps')
-        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+        self.layer = 'RLC'
+        self.draw()
 
     def drawMac(self):
+        self.getMacData()
+        self.layer = 'MAC'
+        self.draw()
+
+    def draw(self):
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
-
-        self.getMacData()
-
         l = 0
         for core in self.data:
             if (l ==0 ):
@@ -194,11 +144,8 @@ class Graph:
             if (l!=0 and l!=len(self.data[core])):
                 print "values have not same size: {} != {}".format(l,len(self.data[core]))
                 break #exit()
-
         sumordinate = [0] * l
         for core in self.data:
-            #absciss = [pair[0] for pair in self.data[core]] # eg time
-
             absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
@@ -207,12 +154,11 @@ class Graph:
             dates = dt.date2num(t)
 
             plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
-            plt.title('MAC throughput')
+            plt.title('{} throughput'.format(self.layer))
             #plt.xticks( rotation=25 )
 
         plt.plot_date(dates[:l],sumordinate, '--',label='total throughput in kbps')
         plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
-
 
 
     def drawBeautiful(self):
@@ -236,7 +182,7 @@ class Graph:
         plt.show()
 
 
-    def draw(self,data):
+    def drawConsole(self,data):
         print 'begin graph'
         # begin curses application
         (v_max,h_max) = self.screen.getmaxyx()
