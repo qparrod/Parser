@@ -284,6 +284,7 @@ class Graph:
         for x,y in sum:
             xpos = int((x - min(absciss)) / hstep)
             ypos = int((y - min(sumordinate)) / vstep )
+            '''
             if tmp[1]==ypos:
                 self.screen.hline(self.Y(ypos),self.X(tmp[0]+1),'-',xpos-tmp[0],curses.color_pair(colorIdx))
             elif tmp[1]!= ypos:
@@ -291,6 +292,7 @@ class Graph:
                     self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'/',curses.color_pair(colorIdx))
                 else:
                     self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'\\',curses.color_pair(colorIdx))
+            '''
             
             self.screen.addstr(self.Y(ypos),self.X(xpos),'*',curses.color_pair(colorIdx))
             tmp = (xpos,ypos)
@@ -298,8 +300,4 @@ class Graph:
         self.screen.refresh()
         self.screen.getch()
 
-        #self.exit()
-        curses.nocbreak()
-        self.screen.keypad(0)
-        curses.echo()
-        curses.endwin()
+        self.exit()
