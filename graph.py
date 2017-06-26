@@ -151,13 +151,13 @@ class Graph:
     def printAxes(self):
         self.screen.addstr(self.Y(self.v_size+1),self.X(0),'^')
         self.screen.vline(self.Y(self.v_size-1),self.X(0),'|',self.v_size)
-        self.screen.addstr(self.y_origin+self.v_size,self.x_origin,'|')
-        self.screen.hline(self.y_origin+self.v_size,self.x_origin+1,'_',self.h_size)
-        self.screen.addstr(self.y_origin+self.v_size,self.x_origin+self.h_size,'>')
+        self.screen.addstr(self.Y(0),self.X(0),'|')
+        self.screen.hline(self.Y(0),self.X(1),'_',self.h_size)
+        self.screen.addstr(self.Y(0),self.X(self.h_size),'>')
 
     def printLegend(self,xlegend,ylegend):
-        self.screen.addstr(self.y_origin+self.v_size+2,int(0.5*(self.x_origin+self.h_size-len(xlegend))),xlegend)
-        self.screen.addstr(self.y_origin+1,self.x_origin+2,ylegend)
+        self.screen.addstr(self.Y(-2),self.X(0.5*(self.h_size-len(xlegend))),xlegend)
+        self.screen.addstr(self.Y(self.v_size,self.X(2)),ylegend)
 
     def X(self,x):
         X = int(self.x_origin + x)
@@ -204,6 +204,16 @@ class Graph:
         self.h_size = h_max-self.x_limit-self.x_origin-1
         self.v_size = v_max-self.y_limit-self.y_origin-1
 
+    def getMaxLength():
+        l = 0
+        for core in self.data:
+            if (l ==0 ):
+                l = len(self.data[core])
+            if (l!=0 and l!=len(self.data[core])):
+                print "values have not same size: {} != {}".format(l,len(self.data[core]))
+                self.exit()
+        return l
+
     def drawConsole(self):
         import curses
 
@@ -216,27 +226,21 @@ class Graph:
         self.screen.clear()
         self.screen.border('|','|','-','-','+','+','+','+')
         
-        self.screen.addstr(1,20,"PDCP throughput ({},{}) ".format(v_max,h_max))
+        self.screen.addstr(self.Y(v_max),self.X(20),"PDCP throughput ({},{}) ".format(v_max,h_max))
 
         self.printAxes()
         self.printLegend('time','throughput in kbps')
 
-        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        color = [curses.COLOR_BLUE,curses.COLOR_RED,curses.COLOR_GREEN,curses.COLOR_PURPLE,curses.COLOR_BLUE]
+        curses.init_pair(1, color[1], curses.COLOR_BLACK)
+        curses.init_pair(2, color[2], curses.COLOR_BLACK)
+        curses.init_pair(3, color[3], curses.COLOR_BLACK)
+        curses.init_pair(4, color[4], curses.COLOR_BLACK)
         
         self.getPdcpData()
 
-
-        # initialize list of sum of values
-        l = 0
-        for core in self.data:
-            if (l ==0 ):
-                l = len(self.data[core])
-            if (l!=0 and l!=len(self.data[core])):
-                print "values have not same size: {} != {}".format(l,len(self.data[core]))
-                self.exit()
+        l = getMaxLength()
         sumordinate = [0] * l
-
 
         i=0
 
@@ -262,38 +266,17 @@ class Graph:
         self.printXRange(hmin,hmax)
 
 
+        colorIdx = 1
         for core in self.data:
             absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # time
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
 
-
-
-            '''
-            xpos = 0    
-            ypos = 0
-            i=i+1
-            for (t,e) in self.data[core]:
-                t = convertTimestampFromStringToTime(t)
-                e = float(e)
-                #xpos=xpos+1
-                xpos = int((t - min(absciss)) / hstep)
-                ypos = int((e - min(ordinate)) / vstep )
-
-                if (self.y_origin+self.v_size-ypos < v_max and self.x_origin+xpos < h_max):
-                    self.screen.addstr(self.y_origin+self.v_size-ypos,self.x_origin+xpos,'+',curses.color_pair(i))
-                else:
-                    self.screen.refresh()
-                    self.screen.getch()
-                    self.exit()
-                    print "ypos={};xpos={}  max=({};{})".format(ypos,xpos,v_max,self.h_max)
-                    print v_max
-                    print self.y_origin+self.v_size-ypos
-                    print h_max
-                    print self.x_origin+xpos
-                    print "error exit"
-                    exit()
-            '''
-
+            coord = zip(absciss,ordinate)
+            for x,y in coord:
+                xpos = int((x-min(absciss))/hstep)
+                ypos = int((y-min(ordinate))/vstep)
+                self.screen.addstr(self.Y(ypos),self.X(xpos),'+',curses.color_pair(colorIdx))
+                
         # print sum
         sum = zip(absciss,sumordinate)
         for x,y in sum:

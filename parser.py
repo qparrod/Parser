@@ -168,7 +168,6 @@ class PoolStats(Parser):
 
 
 import sys
-import getopt
 
 def usage():
     print "python test.py --application <application type> --board=<board type>"
@@ -184,6 +183,7 @@ def main(argv):
     workPathNeeded = False
     console=False
     branch = ''
+    import getopt
     try:
         opts, args = getopt.getopt(argv,"hi:a:b:gw:cm",["application=","board=","wcpy="])
     except getopt.GetoptError as err:
