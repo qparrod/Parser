@@ -22,7 +22,7 @@ class Graph:
         self.screen.keypad(0)
         curses.echo()
         curses.endwin()
-        exit()
+        #exit()
 
 
     def drawBoxes(self):
@@ -157,13 +157,13 @@ class Graph:
 
     def printLegend(self,xlegend,ylegend):
         self.screen.addstr(self.Y(-2),self.X(0.5*(self.h_size-len(xlegend))),xlegend)
-        self.screen.addstr(self.Y(self.v_size,self.X(2)),ylegend)
+        self.screen.addstr(self.Y(self.v_size),self.X(2),ylegend)
 
     def X(self,x):
         X = int(self.x_origin + x)
         (Ymax,Xmax) = self.screen.getmaxyx()
         if X > Xmax or X < 0:
-            print "invalid conversion from x={} to X={} -> max={}".format(x,X,Xmax)
+            raise RuntimeError("invalid conversion from x={} to X={} -> max={}".format(x,X,Xmax))
             self.exit()
         return X
 
@@ -171,8 +171,8 @@ class Graph:
         Y = int(self.y_origin + self.v_size - y)
         (Ymax,Xmax) = self.screen.getmaxyx()
         if Y > Ymax or Y < 0:
-            print "invalid conversion from y={} to Y={} -> max={}".format(y,Y,Ymax)
             self.exit()
+            raise RuntimeError("invalid conversion from y={} to Y={} -> max={}".format(y,Y,Ymax))
         return Y
 
     def convertCoord(self,x,y):
@@ -204,7 +204,7 @@ class Graph:
         self.h_size = h_max-self.x_limit-self.x_origin-1
         self.v_size = v_max-self.y_limit-self.y_origin-1
 
-    def getMaxLength():
+    def getMaxLength(self):
         l = 0
         for core in self.data:
             if (l ==0 ):
@@ -226,23 +226,22 @@ class Graph:
         self.screen.clear()
         self.screen.border('|','|','-','-','+','+','+','+')
         
-        self.screen.addstr(self.Y(v_max),self.X(20),"PDCP throughput ({},{}) ".format(v_max,h_max))
+        self.screen.addstr(self.Y(v_max-6),self.X(20),"PDCP throughput ({},{}) ".format(v_max,h_max))
 
         self.printAxes()
         self.printLegend('time','throughput in kbps')
 
-        color = [curses.COLOR_BLUE,curses.COLOR_RED,curses.COLOR_GREEN,curses.COLOR_PURPLE,curses.COLOR_BLUE]
+        color = [curses.COLOR_RED,curses.COLOR_GREEN,curses.COLOR_BLUE,curses.COLOR_CYAN,curses.COLOR_MAGENTA,curses.COLOR_YELLOW]
         curses.init_pair(1, color[1], curses.COLOR_BLACK)
         curses.init_pair(2, color[2], curses.COLOR_BLACK)
         curses.init_pair(3, color[3], curses.COLOR_BLACK)
         curses.init_pair(4, color[4], curses.COLOR_BLACK)
+        curses.init_pair(5, color[5], curses.COLOR_BLACK)
         
         self.getPdcpData()
 
-        l = getMaxLength()
+        l = self.getMaxLength()
         sumordinate = [0] * l
-
-        i=0
 
         # Calculate time to print in console
         import sys
@@ -266,8 +265,9 @@ class Graph:
         self.printXRange(hmin,hmax)
 
 
-        colorIdx = 1
+        colorIdx = 0
         for core in self.data:
+            colorIdx += 1
             absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # time
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
 
@@ -278,11 +278,22 @@ class Graph:
                 self.screen.addstr(self.Y(ypos),self.X(xpos),'+',curses.color_pair(colorIdx))
                 
         # print sum
+        colorIdx += 1
+        tmp = (0,0)
         sum = zip(absciss,sumordinate)
         for x,y in sum:
             xpos = int((x - min(absciss)) / hstep)
             ypos = int((y - min(sumordinate)) / vstep )
-            self.screen.addstr(self.Y(ypos),self.X(xpos),'*')
+            if tmp[1]==ypos:
+                self.screen.hline(self.Y(ypos),self.X(tmp[0]+1),'-',xpos-tmp[0],curses.color_pair(colorIdx))
+            elif tmp[1]!= ypos:
+                if tmp[1]-ypos < 0:
+                    self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'/',curses.color_pair(colorIdx))
+                else:
+                    self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'\\',curses.color_pair(colorIdx))
+            
+            self.screen.addstr(self.Y(ypos),self.X(xpos),'*',curses.color_pair(colorIdx))
+            tmp = (xpos,ypos)
 
         self.screen.refresh()
         self.screen.getch()
