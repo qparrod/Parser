@@ -45,6 +45,7 @@ class Graph:
 
     def getData(self):
         import csv
+        self.cores = self.getCoreName()
         self.data = {}
         for core in self.cores:
             with open('csv/throughput/{}_throughput_{}.csv'.format(self.layer,core),'r') as csvfile:
@@ -60,45 +61,36 @@ class Graph:
                     pair = (row[0],row[1])
                     self.data[core].append(pair)
 
-    def getPdcpData(self):
-        # TODO find core on available csv file
-        pdcpcore = ['LINUX-Disp_0','LINUX-Disp_1']
-        self.cores = pdcpcore
-        self.layer = 'PDCP'
-        self.getData()
+    def getCoreName(self):
+        from os import listdir
+        from os.path import isfile, join
+        path = 'csv/throughput'
+        files = [f for f in listdir(path) if (isfile(join(path, f)) and self.layer in f)]
 
-
-    def getRlcData(self):
-        # TODO: find core on reading csv file available
-        rlccore = ['FSP-1231','FSP-1232','FSP-1233','FSP-1234']
-        self.cores = rlccore
-        self.layer = 'RLC'
-        self.getData()
-
-    def getMacData(self):
-        # TODO: find core on reading csv file available
-        maccore = ['FSP-1233','FSP-1253']
-        self.cores = maccore
-        self.layer = 'MAC'
-        self.getData()
+        import re
+        cores = []
+        for f in files:
+            m = re.search(r'.+_throughput_(.+).csv',f)
+            if (m):
+                cores.append(m.group(1))
+        return cores
         
 
     def drawPdcp(self):
-        self.getPdcpData()
         self.layer = 'PDCP'
         self.draw()
 
     def drawRlc(self):
-        self.getRlcData()
         self.layer = 'RLC'
         self.draw()
 
     def drawMac(self):
-        self.getMacData()
         self.layer = 'MAC'
         self.draw()
 
     def draw(self):
+        self.getData()
+
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
         l = 0
@@ -132,16 +124,9 @@ class Graph:
 
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
 
-        #fig = plt.figure(1)
-
-        plt.subplot(3,1,1)
-        self.drawPdcp()
-
-        plt.subplot(3,1,2)
-        self.drawRlc()
-        
-        plt.subplot(3,1,3)
-        self.drawMac()
+        plt.subplot(3,1,1); self.drawPdcp()
+        plt.subplot(3,1,2); self.drawRlc()
+        plt.subplot(3,1,3); self.drawMac()
 
         fig.savefig('throughput.png', dpi=100)
 
