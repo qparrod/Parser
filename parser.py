@@ -5,7 +5,6 @@ from layers import *
 from csvWriter import Csv
 import settings
 import csv
-from datetime import datetime, timedelta
 
 
 class ProgressBar:
@@ -40,6 +39,15 @@ def file_len(fname):
         for i, l in enumerate(f):
             pass
     return i + 1
+
+def fromBitToByte(val):
+    return int(val / 8)
+
+def fromByteToBit(val):
+    return val * 8
+
+
+import ptime
     
 
 class Parser:
@@ -61,10 +69,13 @@ class Parser:
             [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
             if core not in self.pdcpthroughput:
                 self.pdcpthroughput[core] = []
-            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-            self.pdcpthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
-            self.pdcpthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
-            self.pdcpthroughput[core].append((t,val3*8/2.0/1024))
+            t = ptime.Time(timestamp)
+            print type(t)
+            print type(t-4)
+            print '{}'.format(t-4)
+            self.pdcpthroughput[core].append((t-4,fromByteToBit(val1)/2.0/1024))
+            self.pdcpthroughput[core].append((t-2,fromByteToBit(val2)/2.0/1024))
+            self.pdcpthroughput[core].append((t,fromByteToBit(val3)/2.0/1024))
 
     def getRlcThroughput(self,rlcpacket,line):
         rlcpacket.readRcvdRcvp()
@@ -74,10 +85,11 @@ class Parser:
             [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
             if core not in self.rlcthroughput:
                 self.rlcthroughput[core] = []
-            t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-            self.rlcthroughput[core].append((t-timedelta(seconds=4),val1*8/2.0/1024))
-            self.rlcthroughput[core].append((t-timedelta(seconds=2),val2*8/2.0/1024))
-            self.rlcthroughput[core].append((t,val3*8/2.0/1024))
+            t = ptime.Time(timestamp)
+
+            self.rlcthroughput[core].append((t-4,fromByteToBit(val1)/2.0/1024))
+            self.rlcthroughput[core].append((t-2,fromByteToBit(val2)/2.0/1024))
+            self.rlcthroughput[core].append((t,fromByteToBit(val3)/2.0/1024))
 
     def getMacThroughput(self,macpacket,line):
         macpacket.readReceivedData()
@@ -87,8 +99,8 @@ class Parser:
             if (ueGroup == '0'): #TODO : generalize this
                 if core not in self.macthroughput:
                     self.macthroughput[core] = []
-                t = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
-                self.macthroughput[core].append((t,int(receivedData)*8/2.0/1024))
+                t = ptime.Time(timestamp)
+                self.macthroughput[core].append((t,fromByteToBit(int(receivedData))/2.0/1024))
 
     def getCpuLoadStats(self,cpuload,line):
         cpuload.read()
@@ -97,10 +109,13 @@ class Parser:
             (core,timestamp,load,max)=values
             if core not in self.cpuload:
                 self.cpuload[core] = []
-            self.cpuload[core].append((timestamp,float(load)))
+            t = ptime.Time(timestamp)
+            self.cpuload[core].append((t,float(load)))
 
 
     def read(self):
+        from datetime import datetime
+
         rlcpacket  = RlcPacket()
         pdcppacket = PdcpPacket()
         macpacket = MacPacket()

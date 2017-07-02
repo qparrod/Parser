@@ -1,15 +1,5 @@
 #!/usr/bin/python2.7
 
-import time
-import datetime
-
-def convertTimestampFromStringToTime(timestampInString):
-    import datetime
-    pattern = "%Y-%m-%d %H:%M:%S.%f"
-    dt = datetime.datetime.strptime(timestampInString, pattern) # create a datetime
-    st = dt.timetuple() # create a time.struct_time
-    return time.mktime(st) # create a 9-tuple expressed time in local time
-
 
 class Graph:
     def __init__(self):
@@ -100,9 +90,13 @@ class Graph:
             if (l!=0 and l!=len(self.data[core])):
                 print "values have not same size: {} != {}".format(l,len(self.data[core]))
                 break #exit()
+
+        import ptime
         sumordinate = [0] * l
+        t = ptime.Time()
         for core in self.data:
-            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
+            print self.data[core]
+            absciss = [ t.convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
 
