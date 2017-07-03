@@ -23,10 +23,8 @@ class ProgressBar:
  
         color = ''
 
-        if (perc!=100): 
-            color = '\033[1m'
-        else:
-            color = '\033[92m'
+        if (perc!=100): color = '\033[1m'
+        else:           color = '\033[92m'
 
         out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),
             time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
@@ -52,12 +50,13 @@ import ptime
 
 class Parser:
     def __init__(self):
-        self.regex = ''
-        self.files = settings.files
-        self.regex = None
-        self.count = 0
+        self.regex    = ''
+        self.files    = settings.files
+        self.regex    = None
+        self.count    = 0
+        self.ueGroups = []
        
-    def search(self,parserType, _string):
+    def search(self, parserType, _string):
         m = parserType.regex.search(_string)
         return (m.group(i+1) for i in range(parserType.count)) if m else ()
 
@@ -66,41 +65,40 @@ class Parser:
         values = self.search(pdcppacket,line)
         if(values!=()):
             (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
-            [val1,val2,val3] = [int(s) for s in inbytes.split() if s.isdigit()]
+            values = [int(s) for s in inbytes.split() if s.isdigit()]
             if core not in self.pdcpthroughput:
                 self.pdcpthroughput[core] = []
             t = ptime.Time(timestamp)
-            print type(t)
-            print type(t-4)
-            print '{}'.format(t-4)
-            self.pdcpthroughput[core].append((t-4,fromByteToBit(val1)/2.0/1024))
-            self.pdcpthroughput[core].append((t-2,fromByteToBit(val2)/2.0/1024))
-            self.pdcpthroughput[core].append((t,fromByteToBit(val3)/2.0/1024))
+            timeDelta = 2.0 # 2 seconds between traces
+            for i in reversed(range(len(values))):
+                self.pdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
+
 
     def getRlcThroughput(self,rlcpacket,line):
         rlcpacket.readRcvdRcvp()
         values = self.search(rlcpacket,line)
         if(values!=()):
             (core,timestamp,rcvd,rcvp,ackd,ackp)=values
-            [val1,val2,val3] = [int(s) for s in rcvd.split() if s.isdigit()]
+            values = [int(s) for s in rcvd.split() if s.isdigit()]
             if core not in self.rlcthroughput:
                 self.rlcthroughput[core] = []
             t = ptime.Time(timestamp)
-
-            self.rlcthroughput[core].append((t-4,fromByteToBit(val1)/2.0/1024))
-            self.rlcthroughput[core].append((t-2,fromByteToBit(val2)/2.0/1024))
-            self.rlcthroughput[core].append((t,fromByteToBit(val3)/2.0/1024))
+            timeDelta = 2.0 # 2 seconds between traces
+            for i in reversed(range(len(values))):
+                self.rlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
 
     def getMacThroughput(self,macpacket,line):
         macpacket.readReceivedData()
         values = self.search(macpacket,line)
         if(values!=()):
             (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
+            if ueGroup not in self.ueGroups:
+                self.ueGroups.append(ueGroup)
             if (ueGroup == '0'): #TODO : generalize this
                 if core not in self.macthroughput:
                     self.macthroughput[core] = []
                 t = ptime.Time(timestamp)
-                self.macthroughput[core].append((t,fromByteToBit(int(receivedData))/2.0/1024))
+                self.macthroughput[core].append((t-0,fromByteToBit(int(receivedData))/2.0/1024))
 
     def getCpuLoadStats(self,cpuload,line):
         cpuload.read()
@@ -110,7 +108,7 @@ class Parser:
             if core not in self.cpuload:
                 self.cpuload[core] = []
             t = ptime.Time(timestamp)
-            self.cpuload[core].append((t,float(load)))
+            self.cpuload[core].append((t-0,float(load)))
 
 
     def read(self):
@@ -335,7 +333,7 @@ def main(argv):
         import graph
         g = graph.Graph()
         if console:
-            g.drawConsole()
+            g.drawConsole('PDCP')
         else:
             g.drawFigure()
 
