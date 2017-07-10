@@ -77,14 +77,13 @@ class Graph:
             if (l ==0 ):
                 l = len(self.data[core])
             if (l!=0 and l!=len(self.data[core])):
-                print "values have not same size: {} != {}".format(l,len(self.data[core]))
+                print "values of core {} have not same size: {} != {}".format(core, l,len(self.data[core]))
                 break #exit()
 
         
         sumordinate = [0] * l
         for core in self.data:
-            t = ptime.Time(format='%Y-%m-%d %H:%M:%S.%f')
-            absciss = [ t.convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
+            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
 
