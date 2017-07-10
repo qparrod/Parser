@@ -1,5 +1,6 @@
 #!/usr/bin/python2.7
 
+import ptime
 
 class Graph:
     def __init__(self):
@@ -33,10 +34,11 @@ class Graph:
             scr.refresh()
         scr_boxes[-1].getch()
 
-    def getData(self):
+    def getData(self,layer):
         import csv
+        self.layer = layer
         self.cores = self.getCoreName()
-        self.data = {}
+        self.data  = {}
         for core in self.cores:
             with open('csv/throughput/{}_throughput_{}.csv'.format(self.layer,core),'r') as csvfile:
                 r = csv.reader(csvfile, delimiter=',') 
@@ -64,22 +66,9 @@ class Graph:
             if (m):
                 cores.append(m.group(1))
         return cores
-        
 
-    def drawPdcp(self):
-        self.layer = 'PDCP'
-        self.draw()
-
-    def drawRlc(self):
-        self.layer = 'RLC'
-        self.draw()
-
-    def drawMac(self):
-        self.layer = 'MAC'
-        self.draw()
-
-    def draw(self):
-        self.getData()
+    def draw(self,layer):
+        self.getData(layer)
 
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
@@ -91,16 +80,15 @@ class Graph:
                 print "values have not same size: {} != {}".format(l,len(self.data[core]))
                 break #exit()
 
-        import ptime
+        
         sumordinate = [0] * l
-        t = ptime.Time()
         for core in self.data:
-            print self.data[core]
+            t = ptime.Time(format='%Y-%m-%d %H:%M:%S.%f')
             absciss = [ t.convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
 
-            t = [datetime.datetime.strptime(time.strftime('%H:%M:%S',time.localtime(int(i))),'%H:%M:%S') for i in absciss]
+            t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
             dates = dt.date2num(t)
 
             plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
@@ -118,9 +106,9 @@ class Graph:
 
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
 
-        plt.subplot(3,1,1); self.drawPdcp()
-        plt.subplot(3,1,2); self.drawRlc()
-        plt.subplot(3,1,3); self.drawMac()
+        plt.subplot(3,1,1); self.draw('PDCP')
+        plt.subplot(3,1,2); self.draw('RLC')
+        plt.subplot(3,1,3); self.draw('MAC')
 
         fig.savefig('throughput.png', dpi=100)
 
@@ -162,12 +150,10 @@ class Graph:
         return [(self.X(x),self.Y(y)) for x,y in coord_list]
 
     def printXRange(self,min,max):
-        mintime = time.strftime('%H:%M:%S',time.localtime(min))
-        #mindate = datetime.datetime.fromtimestamp(int(min(absciss)))
-        #mintime = mindate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        mintime = ptime.Time(format='%H:%M:%S').convertLocalTimeToTime(min)#time.strftime('%H:%M:%S',time.localtime(min))
         self.screen.addstr(self.Y(-1),self.X(0),mintime)
 
-        maxtime = time.strftime('%H:%M:%S',time.localtime(max))
+        maxtime = ptime.Time(format='%H:%M:%S').convertLocalTimeToTime(max) #time.strftime('%H:%M:%S',time.localtime(max))
         self.screen.addstr(self.Y(-1),self.X(self.h_size-len(maxtime)),maxtime)
 
     def printYRange(self,min,max):
@@ -193,7 +179,7 @@ class Graph:
                 self.exit()
         return l
 
-    def drawConsole(self):
+    def drawConsole(self,layer):
         import curses
 
         self.screen = curses.initscr()
@@ -205,7 +191,7 @@ class Graph:
         self.screen.clear()
         self.screen.border('|','|','-','-','+','+','+','+')
         
-        self.screen.addstr(self.Y(v_max-6),self.X(20),"PDCP throughput ({},{}) ".format(v_max,h_max))
+        self.screen.addstr(self.Y(v_max-6),self.X(20),"{} throughput ({},{}) ".format(layer,v_max,h_max))
 
         self.printAxes()
         self.printLegend('time','throughput in kbps')
@@ -217,7 +203,7 @@ class Graph:
         curses.init_pair(4, color[4], curses.COLOR_BLACK)
         curses.init_pair(5, color[5], curses.COLOR_BLACK)
         
-        self.getPdcpData()
+        self.getData(layer)
 
         l = self.getMaxLength()
         sumordinate = [0] * l
@@ -229,7 +215,7 @@ class Graph:
         vmax=0
         vmin= sys.maxint
         for core in self.data:
-            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # timestamps
+            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertFromStringToLocalTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # values to plot
             sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
             hmin = min(hmin,min(absciss))
@@ -247,7 +233,7 @@ class Graph:
         colorIdx = 0
         for core in self.data:
             colorIdx += 1
-            absciss = [ convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ] # time
+            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertFromStringToLocalTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
 
             coord = zip(absciss,ordinate)
@@ -263,15 +249,6 @@ class Graph:
         for x,y in sum:
             xpos = int((x - min(absciss)) / hstep)
             ypos = int((y - min(sumordinate)) / vstep )
-            '''
-            if tmp[1]==ypos:
-                self.screen.hline(self.Y(ypos),self.X(tmp[0]+1),'-',xpos-tmp[0],curses.color_pair(colorIdx))
-            elif tmp[1]!= ypos:
-                if tmp[1]-ypos < 0:
-                    self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'/',curses.color_pair(colorIdx))
-                else:
-                    self.screen.addstr(self.Y(tmp[1]),self.X(tmp[0]+1),'\\',curses.color_pair(colorIdx))
-            '''
             
             self.screen.addstr(self.Y(ypos),self.X(xpos),'*',curses.color_pair(colorIdx))
             tmp = (xpos,ypos)

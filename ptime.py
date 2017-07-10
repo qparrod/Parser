@@ -17,13 +17,13 @@ class Time:
         # create a 9-tuple expressed time in local time
         return time.mktime(self.convertFromString(timestamp).timetuple())
 
-    def convertLocalTime(self,val):
-        t = convertLocalTimeToTime(val)
-        return datetime.strptime(t,self.format)
-
     def convertLocalTimeToTime(self,val):
         return time.strftime(self.format,time.localtime(val))
-        
+
+    def convertLocalTime(self,val):
+        t = self.convertLocalTimeToTime(val)
+        return datetime.strptime(t,self.format)
+      
     def __add__(self,val):
         return self.time + timedelta(seconds=val)
 
