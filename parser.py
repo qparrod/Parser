@@ -196,9 +196,10 @@ def main(argv):
     workPathNeeded = False
     console=False
     branch = ''
+    settings.png = False
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cm",["application=","board=","wcpy="])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cm",["application=","board=","wcpy=","png"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -219,6 +220,8 @@ def main(argv):
             if application not in ("syslogAnalyzer","eventAnalyzer","comparePerf"):
                 print "wrong application: " + application
                 sys.exit()
+        elif opt in("--png"):
+            settings.png = True
         elif opt in ("-b", "--board"):
             board = arg
             if board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):

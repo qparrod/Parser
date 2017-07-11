@@ -68,6 +68,7 @@ class Graph:
         return cores
 
     def draw(self,layer):
+        print "graph: draw {}".format(layer)
         self.getData(layer)
 
         import matplotlib.dates as dt
@@ -102,14 +103,16 @@ class Graph:
         import matplotlib.pyplot as plt
 
         mydpi = 50
-
+        print "drawFigure: dpi={}".format(mydpi)
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
-
+        print "figure created"
         plt.subplot(3,1,1); self.draw('PDCP')
         plt.subplot(3,1,2); self.draw('RLC')
         plt.subplot(3,1,3); self.draw('MAC')
-
-        fig.savefig('throughput.png', dpi=100)
+        
+        import settings
+        if (settings.png):
+            fig.savefig('throughput.png', dpi=100)
 
         plt.show()
 
