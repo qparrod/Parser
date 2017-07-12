@@ -16,13 +16,17 @@ class PdcpPacket(Parser):
         #self.regex = re.compile(r'8:(\d+) 9:(\d+) 10:(\d+)')
         #self.count = 2
 
-    def read(self):
+    def setDl(self):
         if (True): # cloud
             self.regex = re.compile(r'(VM-\d+) (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)')
             self.count = 10
         else:
             self.regex = re.compile(r'(FSP-\d+) <(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)') 
             self.count = 9
+
+    def setUl(self):
+        self.regex = re.compile(r'(VM-\d+) (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+)')
+        self.count = 4
 
     def noReceived(self):
         return sum(element for element in self.map['receive']) if 'receive' in self.map.keys() else 0
@@ -47,6 +51,8 @@ class RlcPacket(Parser):
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)') # filter VM
         self.count = 6
+
+
 
 
     def readBuffer(self):

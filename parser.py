@@ -61,7 +61,7 @@ class Parser:
         return (m.group(i+1) for i in range(parserType.count)) if m else ()
 
     def getPdcpThroughput(self,pdcppacket,line):
-        pdcppacket.read()
+        pdcppacket.setDl()
         values = self.search(pdcppacket,line)
         if(values!=()):
             (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
@@ -72,6 +72,18 @@ class Parser:
             timeDelta = 2.0 # 2 seconds between traces
             for i in reversed(range(len(values))):
                 self.pdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
+
+        pdcppacket.setUl()
+        values = self.search(pdcppacket,line)
+        if(values!=()):
+            (soc,core,timestamp,data) = values
+            values = [ int(s) for s in data.split() if s.isdigit() ]
+            if core not in self.ulpdcpthroughput:
+                self.ulpdcpthroughput[core] = []
+            t = ptime.Time(timestamp)
+            timeDelta = 2.0
+            for i in reversed(range(len(values))):
+                self.ulpdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
 
 
     def getRlcThroughput(self,rlcpacket,line):
@@ -86,6 +98,18 @@ class Parser:
             timeDelta = 2.0 # 2 seconds between traces
             for i in reversed(range(len(values))):
                 self.rlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
+        
+        rlcpacket.readUlRcvdRcvp()
+        values = self.search(rlcpacket,line)
+        if(values!=()):
+            (core,timestamp,data)=values
+            values = [int(s) for s in data.split() if s.isdigit()]
+            if core not in self.ulrlcthroughput:
+                self.ulrlcthroughput[core] = []
+            t = ptime.Time(timestamp)
+            timeDelta = 2.0 # 2 seconds between traces
+            for i in reversed(range(len(values))):
+                self.ulrlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
 
     def getMacThroughput(self,macpacket,line):
         macpacket.readReceivedData()
@@ -121,7 +145,9 @@ class Parser:
 
         self.cpuload        = {}
         self.pdcpthroughput = {}
+        self.ulpdcpthroughput = {}
         self.rlcthroughput  = {}
+        self.ulrlcthroughput = {}
         self.macthroughput  = {}
         
         totalTime = datetime.now() 
@@ -152,8 +178,14 @@ class Parser:
     def getPDCPThroughput(self):
         return self.pdcpthroughput
 
+    def getUlPdcpThroughput(self):
+        return self.ulpdcpthroughput
+
     def getRLCThroughput(self):
         return self.rlcthroughput
+
+    def getUlRlcThroughput(self):
+        return self.ulrlcthroughput
 
     def getMACThroughput(self):
         return self.macthroughput
@@ -326,8 +358,10 @@ def main(argv):
         parser=Parser()
         parser.read()
 
-        createCsvThroughput('PDCP',parser.getPDCPThroughput())
-        createCsvThroughput('RLC',parser.getRLCThroughput())
+        createCsvThroughput('DL_PDCP',parser.getPDCPThroughput())
+        createCsvThroughput('UL_PDCP',parser.getUlPdcpThroughput())
+        createCsvThroughput('DL_RLC',parser.getRLCThroughput())
+        createCsvThroughput('UL_RLC',parser.getUlRlcThroughput())
         createCsvThroughput('MAC',parser.getMACThroughput())
 
         createCsvLoad(parser.getCpuLoad())
@@ -341,10 +375,11 @@ def main(argv):
             g.drawFigure()
 
 
-
 def createCsv(name,type,data):
-    #if name=='MAC': print data
     for core in data:
+        if all(e[1]<0.1 for e in data[core]):
+            print "{}: data always 0.0 for core {}".format(name,core)
+            continue
         directory = ''
         header= []
         if (type=="throughput"):

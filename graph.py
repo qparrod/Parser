@@ -83,6 +83,7 @@ class Graph:
 
         
         sumordinate = [0] * l
+        dates = []
         for core in self.data:
             absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
             ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
@@ -95,7 +96,7 @@ class Graph:
             plt.title('{} throughput'.format(self.layer))
             #plt.xticks( rotation=25 )
 
-        plt.plot_date(dates[:l],sumordinate, '--',label='total throughput in kbps')
+        plt.plot_date(dates[:l], sumordinate, '--',label='total throughput in kbps')
         plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
 
 
@@ -103,12 +104,13 @@ class Graph:
         import matplotlib.pyplot as plt
 
         mydpi = 50
-        print "drawFigure: dpi={}".format(mydpi)
+        print "drawFigure with dpi={}. This can take few seconds...".format(mydpi)
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
         print "figure created"
-        plt.subplot(3,1,1); self.draw('PDCP')
-        plt.subplot(3,1,2); self.draw('RLC')
-        plt.subplot(3,1,3); self.draw('MAC')
+        plt.subplot(3,2,1); self.draw('DL_PDCP')
+        plt.subplot(3,2,2); self.draw('UL_PDCP')
+        plt.subplot(3,2,3); self.draw('RLC')
+        plt.subplot(3,2,5); self.draw('MAC')
         
         import settings
         if (settings.png):
