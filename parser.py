@@ -228,10 +228,11 @@ def main(argv):
     workPathNeeded = False
     console=False
     branch = ''
+    path=''
     settings.png = False
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cm",["application=","board=","wcpy=","png"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:",["application=","board=","wcpy=","png"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -245,6 +246,8 @@ def main(argv):
         elif opt in ('-w','--wcpy'):
             workPathNeeded = True
             branch = arg
+        elif opt in ('-p'):
+            path = arg
         elif opt in ("-i", "--ifile"):
             inputfile = arg
         elif opt in ("-a", "--application"):
@@ -265,11 +268,12 @@ def main(argv):
     
     # check all files in results folder
     import os
-    if not workPathNeeded:
-        path = "/home/quentin/Python/Parser/results"
-    else:
-        user = os.getlogin()
-        path = "/var/fpwork/"+ str(user) + "/"+branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    if path =='':
+        if not workPathNeeded:
+            path = "/home/quentin/Python/Parser/results"
+        else:
+            user = os.getlogin()
+            path = "/var/fpwork/"+ str(user) + "/"+branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "path=" + path
 
     import sys
@@ -376,6 +380,8 @@ def main(argv):
 
 
 def createCsv(name,type,data):
+    if data == {}:
+        print "no data collected for {} {}".format(name,type)
     for core in data:
         if all(e[1]<0.1 for e in data[core]):
             print "{}: data always 0.0 for core {}".format(name,core)
