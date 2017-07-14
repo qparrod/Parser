@@ -443,7 +443,7 @@ def createCsv(name,type,data):
             print "csv file type not recognized"
             exit()
 
-        if 'MAC' in name:
+        if 'MAC' in name or 'UL_RLC' in name:
             ueGroupToFilter = filtering(data[core])
             ueGroups=[]
 
@@ -462,7 +462,6 @@ def createCsv(name,type,data):
                     writer = csv.writer(fd)
                 writer.writerow(line)
                 fd.close()
-
         else:
             if (all(e[1]<0.1 for e in data[core]) ):
                 if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
