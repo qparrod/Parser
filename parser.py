@@ -5,6 +5,13 @@ from layers import *
 from csvWriter import Csv
 import settings
 import csv
+import ptime
+
+class Color:
+    ok       = '\033[92m'
+    error    = '\033[91m'
+    warning  = '\033[93m'
+    nocolor  = '\033[0m'
 
 
 class ProgressBar:
@@ -23,8 +30,8 @@ class ProgressBar:
  
         color = ''
 
-        if (perc!=100): color = '\033[1m'
-        else:           color = '\033[92m'
+        if (perc!=100): color = Color.nocolor
+        else:           color = Color.ok
 
         out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),
             time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
@@ -45,8 +52,50 @@ def fromByteToBit(val):
     return val * 8
 
 
-import ptime
-    
+class Check:
+    def __init__(self):
+        self.count     = 0
+        self.extension = '.txt'
+        self.type      = ''
+        self.pattern   = ''
+
+    def checkFile(self):
+        fd = open(self.type + self.extension,'w')
+        for filename in settings.files:
+            if 'udplog' not in filename: continue
+            tmpcount = 0
+            print "check {} in {}".format(self.type,filename)
+            with open(filename,'r') as f:
+                for line in f:
+                    if re.search(r'{}'.format(self.pattern),line):
+                        self.count += 1
+                        tmpcount += 1
+                        fd.write(line)
+            print "{} {}".format(tmpcount,self.type)
+        fd.close()
+
+    def printResult(self):
+        if self.count == 0:
+            print Color.ok + "No {}".format(self.type) + Color.nocolor
+        else:
+            print Color.error + "Number of {} : {}".format(self.type,self.count) + Color.nocolor
+        
+
+class Warning(Check):
+    def __init__(self):
+        Check.__init__(self)
+        self.type    = 'warning'
+        self.pattern = 'WRN'
+        self.checkFile()
+        self.printResult()
+
+class Error(Check):
+    def __init__(self):
+        Check.__init__(self)
+        self.type    = 'error'
+        self.pattern = 'ERR'
+        self.checkFile()
+        self.printResult()
 
 class Parser:
     def __init__(self):
@@ -397,6 +446,9 @@ def main(argv):
 
         createCsvLoad(parser.getCpuLoad())
 
+        Warning()
+        Error()
+
     if (graphAllowed):
         import graph
         g = graph.Graph()
@@ -430,6 +482,7 @@ def filtering(data):
 def createCsv(name,type,data):
     if data == {}:
         print "\033[91mno data collected for {} {}\033[0m".format(name,type)
+        return
     for core in data:
         directory = ''
         header= []
