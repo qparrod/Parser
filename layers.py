@@ -68,3 +68,18 @@ class MacPacket(Parser):
     def readReceivedData(self):
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*DLUE STATS 1/.*x(\d)lF.*/1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) 10:(\d+)')
         self.count = 13
+
+    def readUlThroughputP1(self):
+        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 1/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)') # MAC
+        self.count = 12
+
+    def readUlThroughputP2(self):
+        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 2/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) ') # MAC
+        self.count = 12
+        '''
+        43820 12 FSP-1243 <0001-01-01T00:01:15.844608Z> 13-EmDispatch INF/LTE L2/ULUE STATS 1/c1rFFFFuFFFFFFx0lF/1:0 2:0
+        3:0 4:0 5:0 6:0 7:0 8:0 9:0
+         43821 13 FSP-1243 <0001-01-01T00:01:15.844613Z> 13-EmDispatch INF/LTE L2/ULUE STATS 2/c1rFFFFuFFFFFFx0lF/1:0
+         2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0
+        '''
+        

@@ -54,7 +54,6 @@ class Parser:
         self.files    = settings.files
         self.regex    = None
         self.count    = 0
-        self.ueGroups = []
        
     def search(self, parserType, _string):
         m = parserType.regex.search(_string)
@@ -98,7 +97,7 @@ class Parser:
             timeDelta = 2.0 # 2 seconds between traces
             for i in reversed(range(len(values))):
                 self.rlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
-        
+        ''' 
         rlcpacket.readUlRcvdRcvp()
         values = self.search(rlcpacket,line)
         if(values!=()):
@@ -110,19 +109,36 @@ class Parser:
             timeDelta = 2.0 # 2 seconds between traces
             for i in reversed(range(len(values))):
                 self.ulrlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
+        '''
 
     def getMacThroughput(self,macpacket,line):
         macpacket.readReceivedData()
         values = self.search(macpacket,line)
         if(values!=()):
             (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
-            if ueGroup not in self.ueGroups:
-                self.ueGroups.append(ueGroup)
-            if (ueGroup == '0'): #TODO : generalize this
-                if core not in self.macthroughput:
-                    self.macthroughput[core] = []
-                t = ptime.Time(timestamp)
-                self.macthroughput[core].append((t-0,fromByteToBit(int(receivedData))/2.0/1024))
+            if core not in self.macthroughput:
+                self.macthroughput[core] = []
+            t = ptime.Time(timestamp)
+            self.macthroughput[core].append((t-0,ueGroup,fromByteToBit(int(receivedData))/2.0/1024))
+
+        macpacket.readUlThroughputP1()
+        values = self.search(macpacket,line)
+        if(values!=()):
+            (core,timestamp,ueGroup,recTBs,crcFails,msg3s,MacCEs,paddingData,NOK_MacHdrs,rlcPdus,rlcPduData,drbSdus)=values
+            if core not in self.ulrlcthroughput:
+                self.ulrlcthroughput[core] = []
+            t = ptime.Time(timestamp)
+            self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
+
+        macpacket.readUlThroughputP2()
+        values = self.search(macpacket,line)
+        if(values!=()):
+            (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK,RlcHdrs,discPdus)=values
+            if core not in self.ulmacthroughput:
+                self.ulmacthroughput[core] = []
+            t = ptime.Time(timestamp)
+            self.ulmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(drbSduData))/2.0/1024))
+
 
     def getCpuLoadStats(self,cpuload,line):
         cpuload.read()
@@ -149,6 +165,7 @@ class Parser:
         self.rlcthroughput  = {}
         self.ulrlcthroughput = {}
         self.macthroughput  = {}
+        self.ulmacthroughput = {}
         
         totalTime = datetime.now() 
         for filename in self.files:
@@ -189,6 +206,9 @@ class Parser:
 
     def getMACThroughput(self):
         return self.macthroughput
+
+    def getUlMacThroughput(self):
+        return self.ulmacthroughput
 
     def getCpuLoad(self):
         return self.cpuload
@@ -232,7 +252,7 @@ def main(argv):
     settings.png = False
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:",["application=","board=","wcpy=","png"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -241,6 +261,8 @@ def main(argv):
         if opt == '-h':
             usage()
             sys.exit()
+        elif opt == '-v':
+            settings.verbose = True
         elif opt == '-g':
             graphAllowed = True
         elif opt in ('-w','--wcpy'):
@@ -366,7 +388,8 @@ def main(argv):
         createCsvThroughput('UL_PDCP',parser.getUlPdcpThroughput())
         createCsvThroughput('DL_RLC',parser.getRLCThroughput())
         createCsvThroughput('UL_RLC',parser.getUlRlcThroughput())
-        createCsvThroughput('MAC',parser.getMACThroughput())
+        createCsvThroughput('DL_MAC',parser.getMACThroughput())
+        createCsvThroughput('UL_MAC',parser.getUlMacThroughput())
 
         createCsvLoad(parser.getCpuLoad())
 
@@ -378,14 +401,32 @@ def main(argv):
         else:
             g.drawFigure()
 
+def getAllUeGroup(data):
+    ueGroups = []
+    for (timestamp,uegroup,value) in data:
+        if uegroup not in ueGroups: ueGroups.append(uegroup)
+    return ueGroups
+
+def getValuesFromUeGroup(data,ref):
+    values = []
+    for (timestamp,uegroup,value) in data:
+        if uegroup==ref: values.append(value)
+    return values
+
+def filtering(data):
+    ueGroupToFilter = []
+    ueGroups = getAllUeGroup(data)
+    for uegroup in ueGroups:
+        values = getValuesFromUeGroup(data,uegroup)
+        if all(v<0.1 for v in values):
+            ueGroupToFilter.append(uegroup)
+    return ueGroupToFilter
+
 
 def createCsv(name,type,data):
     if data == {}:
-        print "no data collected for {} {}".format(name,type)
+        print "\033[91mno data collected for {} {}\033[0m".format(name,type)
     for core in data:
-        if all(e[1]<0.1 for e in data[core]):
-            print "{}: data always 0.0 for core {}".format(name,core)
-            continue
         directory = ''
         header= []
         if (type=="throughput"):
@@ -397,12 +438,38 @@ def createCsv(name,type,data):
         else:
             print "csv file type not recognized"
             exit()
-        fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
-        writer = csv.writer(fd)
-        writer.writerow(header)
-        for line in data[core]:
-            writer.writerow(line)
-        fd.close()
+
+        if 'MAC' in name:
+            ueGroupToFilter = filtering(data[core])
+            ueGroups=[]
+
+            for (timestamp,ueGroup,throughput) in data[core]:
+                if(ueGroup in ueGroupToFilter):
+                    continue
+                line = (timestamp,throughput)
+                fd = 0 
+                if ueGroup not in ueGroups:
+                    ueGroups.append(ueGroup)
+                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'w')
+                    writer = csv.writer(fd)
+                    writer.writerow(header)
+                else:
+                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'a')
+                    writer = csv.writer(fd)
+                writer.writerow(line)
+                fd.close()
+
+        else:
+            if (all(e[1]<0.1 for e in data[core]) ):
+                if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
+                continue
+            fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
+            writer = csv.writer(fd)
+            writer.writerow(header)
+            for line in data[core]:
+                writer.writerow(line)
+            fd.close()
+    print "CSV file created for {} {}".format(name,type)
 
 def createCsvThroughput(layerName,data):
     createCsv(layerName,'throughput',data)

@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 
 import ptime
+import settings
 
 class Graph:
     def __init__(self):
@@ -34,24 +35,35 @@ class Graph:
             scr.refresh()
         scr_boxes[-1].getch()
 
-    def getData(self,layer):
+    def getDataFromFile(self,filePath):
         import csv
+        with open(filePath,'r') as csvfile:
+            r = csv.reader(csvfile, delimiter=',') 
+            
+            if self.core not in self.data:
+                self.data[self.core] = {}
+            for row  in r:
+                if len(row) != 2:
+                    print "wrong csv format for {}".format(self.layer)
+                    exit()
+                # retrieve header
+                if row[0] == 'timestamp':
+                    continue
+
+                if self.ueGroup not in self.data[self.core]:
+                    self.data[self.core][self.ueGroup] = []
+
+                self.data[self.core][self.ueGroup].append(row)
+
+    def getData(self,layer):
         self.layer = layer
         self.cores = self.getCoreName()
         self.data  = {}
         for core in self.cores:
-            with open('csv/throughput/{}_throughput_{}.csv'.format(self.layer,core),'r') as csvfile:
-                r = csv.reader(csvfile, delimiter=',') 
-                self.data[core] = []
-                for row  in r:
-                    if len(row) != 2:
-                        print "wrong csv format"
-                        exit()
-                    # retrieve header
-                    if row[0] == 'timestamp':
-                        continue
-                    pair = (row[0],row[1])
-                    self.data[core].append(pair)
+            self.core = core
+            self.ueGroup = 0 if 'MAC' not in self.layer else core[-1]
+            csvFilePath = 'csv/throughput/{}_throughput_{}.csv'.format(self.layer,core)
+            self.getDataFromFile(csvFilePath)
 
     def getCoreName(self):
         from os import listdir
@@ -75,26 +87,27 @@ class Graph:
         import matplotlib.pyplot as plt
         l = 0
         for core in self.data:
-            if (l ==0 ):
-                l = len(self.data[core])
-            if (l!=0 and l!=len(self.data[core])):
-                print "values of core {} have not same size: {} != {}".format(core, l,len(self.data[core]))
-                break #exit()
-
+            for ueGroup in self.data[core]:
+                if (l ==0 ):
+                    l = len(self.data[core][ueGroup])
+                if (l!=0 and l!=len(self.data[core][ueGroup])):
+                    print "values of core {} have not same size: {} != {}".format(core, l,len(self.data[core][ueGroup]))
+                    break
         
         sumordinate = [0] * l
         dates = []
         for core in self.data:
-            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(pair[0]) for pair in self.data[core] ]
-            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
-            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
+            for ueGroup in self.data[core]:
+                absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core][ueGroup] ]
+                ordinate = [float(data[1]) for data in self.data[core][ueGroup]] # value to plot
+                sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
 
-            t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
-            dates = dt.date2num(t)
+                t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
+                dates = dt.date2num(t)
 
-            plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
-            plt.title('{} throughput'.format(self.layer))
-            #plt.xticks( rotation=25 )
+                plt.plot_date(dates,ordinate,'-', label='{} throughput ueGroup={} in kbps'.format(core,ueGroup))
+                plt.title('{} throughput'.format(self.layer))
+                #plt.xticks( rotation=25 )
 
         plt.plot_date(dates[:l], sumordinate, '--',label='total throughput in kbps')
         plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
@@ -109,8 +122,9 @@ class Graph:
         print "figure created"
         plt.subplot(3,2,1); self.draw('DL_PDCP')
         plt.subplot(3,2,2); self.draw('UL_PDCP')
-        plt.subplot(3,2,3); self.draw('RLC')
-        plt.subplot(3,2,5); self.draw('MAC')
+        plt.subplot(3,2,3); self.draw('DL_RLC')
+        plt.subplot(3,2,5); self.draw('DL_MAC')
+        #plt.subplot(3,2,6); self.draw('UL_MAC')
         
         import settings
         if (settings.png):
