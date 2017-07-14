@@ -105,18 +105,20 @@ class Graph:
                 t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
                 dates = dt.date2num(t)
 
-                plt.plot_date(dates,ordinate,'-', label='{} throughput ueGroup={} in kbps'.format(core,ueGroup))
+                plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
                 plt.title('{} throughput'.format(self.layer))
                 #plt.xticks( rotation=25 )
 
-        plt.plot_date(dates[:l], sumordinate, '--',label='total throughput in kbps')
-        plt.legend(bbox_to_anchor=(1.1, 1.05), shadow=True)
+        plt.plot_date(dates[:l], sumordinate, '--',label='total throughput in kbps', linewidth=4)
+        plt.legend()
+        #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, shadow=True, borderaxespad=0.)
 
 
     def drawFigure(self):
         import matplotlib.pyplot as plt
+        import settings
 
-        mydpi = 50
+        mydpi = settings.dpi 
         print "drawFigure with dpi={}. This can take few seconds...".format(mydpi)
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
         print "figure created"
@@ -126,11 +128,8 @@ class Graph:
         plt.subplot(3,2,5); self.draw('DL_MAC')
         #plt.subplot(3,2,6); self.draw('UL_MAC')
         
-        import settings
-        if (settings.png):
-            fig.savefig('throughput.png', dpi=100)
-
-        plt.show()
+        if settings.png:       fig.savefig('throughput.png', dpi=100)
+        if settings.showGraph: plt.show()
 
 
     def printAxes(self):

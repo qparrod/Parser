@@ -252,7 +252,7 @@ def main(argv):
     settings.png = False
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png","dpi=","show"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -268,9 +268,13 @@ def main(argv):
         elif opt in ('-w','--wcpy'):
             workPathNeeded = True
             branch = arg
+        elif opt == '--dpi':
+            settings.dpi = int(arg)
+        elif opt == '--show':
+            settings.showgraph = True
         elif opt in ('-p'):
             path = arg
-        elif opt in ("-i", "--ifile"):
+        elif opt in ("-i"):
             inputfile = arg
         elif opt in ("-a", "--application"):
             application = arg
