@@ -7,9 +7,46 @@ import ptime
 def fromByteToBit(val):
     return val * 8
 
+class Common(Parser):
+    srbSduData = 0
+    receivedTBs = 0
+    srbSdus = 0
+    crcFails = 0
+    msg3s = 0
+    MacCEs = 0
+    paddingData =0
+    nokMacHeader = 0
+    rlcPdus = 0
+    drbSdus = 0
+    lostUmPdus = 0
+    discardedPdu = 0
+    uplinkNack   = 0
+    amPduSegments = 0
+    nokRlcHeader = 0
+    forwardedSdus = 0
+
+    def __init__(self):
+        Parser.__init__(self)
+
+    def printStatistics(self):
+        from settings import Color
+        print Color.bold + '   Other statistics:' + Color.nocolor
+        pipe = Color.bold + "|" + Color.nocolor 
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+        print Color.bold + '|          MAC                       |              RLC                  |' + Color.nocolor
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+        print pipe + " total received TB      = {0:<8}  ".format(Common.receivedTBs)  + pipe + "  total SRB SDUs        = {0:<8} ".format(Common.srbSdus)       + pipe
+        print pipe + " total CRC failures     = {0:<8}  ".format(Common.crcFails)     + pipe + "  total SRB SDU data    = {0:<8} ".format(Common.srbSduData)    + pipe
+        print pipe + " total msg3s            = {0:<8}  ".format(Common.msg3s)        + pipe + "  total UL NACK         = {0:<8} ".format(Common.uplinkNack)    + pipe
+        print pipe + " total MAC CEs          = {0:<8}  ".format(Common.MacCEs)       + pipe + "  total lost UM PDUs    = {0:<8} ".format(Common.lostUmPdus)    + pipe
+        print pipe + " total paddingData      = {0:<8}  ".format(Common.paddingData)  + pipe + "  total forwarded SDUs  = {0:<8} ".format(Common.forwardedSdus) + pipe
+        print pipe + " total NOK Mac Headers  = {0:<8}  ".format(Common.nokMacHeader) + pipe + "  total AM PDU segments = {0:<8} ".format(Common.amPduSegments) + pipe
+        print pipe + " total RLC PDUs         = {0:<8}  ".format(Common.rlcPdus)      + pipe + "  total NOK RLC Header  = {0:<8} ".format(Common.nokRlcHeader)  + pipe
+        print pipe + " total DRB SDUs         = {0:<8}  ".format(Common.drbSdus)      + pipe + "  total discarded PDU   = {0:<8} ".format(Common.discardedPdu)  + pipe
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+
 class PdcpPacket(Parser):
     def __init__(self):
-        self.regex = None
         Parser.__init__(self)
         self.pdcpthroughput   = {}
         self.ulpdcpthroughput = {}
@@ -46,7 +83,7 @@ class PdcpPacket(Parser):
 
     def getPdcpThroughputFromLine(self,pdcppacket,line):
         pdcppacket.setDl()
-        values = self.search(pdcppacket,line)
+        values = self.search(line)
         if(values!=()):
             (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
             values = [int(s) for s in inbytes.split() if s.isdigit()]
@@ -58,7 +95,7 @@ class PdcpPacket(Parser):
                 self.pdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
 
         pdcppacket.setUl()
-        values = self.search(pdcppacket,line)
+        values = self.search(line)
         if(values!=()):
             (soc,core,timestamp,data) = values
             values = [ int(s) for s in data.split() if s.isdigit() ]
@@ -72,15 +109,17 @@ class PdcpPacket(Parser):
     def getPDCPThroughput(self):
         return self.pdcpthroughput
 
+    def getUlPdcpThroughput(self):
+        return self.ulpdcpthroughput
+
 
 
 
 class RlcPacket(Parser):
     def __init__(self):
-        self.count = 0
         self.rlcthroughput  = {}
         self.ulrlcthroughput = {}
-!
+
     def readRcvdRcvp(self):
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)') # filter VM
@@ -94,9 +133,13 @@ class RlcPacket(Parser):
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
         self.count = 4
 
+    def readUlThroughputP1(self):
+        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 1/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)')
+        self.count = 12
+
     def getRlcThroughput(self,rlcpacket,line):
-        rlcpacket.readRcvdRcvp()
-        values = self.search(rlcpacket,line)
+        self.readRcvdRcvp()
+        values = self.search(line)
         if(values!=()):
             (core,timestamp,rcvd,rcvp,ackd,ackp)=values
             values = [int(s) for s in rcvd.split() if s.isdigit()]
@@ -106,6 +149,29 @@ class RlcPacket(Parser):
             timeDelta = 2.0 # 2 seconds between traces
             for i in reversed(range(len(values))):
                 self.rlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
+
+        self.readUlThroughputP1()
+        values = self.search(line)
+        if(values!=()):
+            (core,timestamp,ueGroup,recTBs,crcFails,msg3s,MacCEs,paddingData,NOK_MacHdrs,rlcPdus,rlcPduData,drbSdus)=values
+            if core not in self.ulrlcthroughput:
+                self.ulrlcthroughput[core] = []
+            t = ptime.Time(timestamp)
+            self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
+            Common.receivedTBs += int(recTBs)
+            Common.crcFails += int(crcFails)
+            Common.msg3s += int(msg3s)
+            Common.MacCEs += int(MacCEs)
+            Common.paddingData += int(paddingData)
+            Common.nokMacHeader += int(NOK_MacHdrs)
+            Common.rlcPdus += int(rlcPdus)
+            Common.drbSdus += int(drbSdus)
+
+    def getRLCThroughput(self):
+        return self.rlcthroughput
+
+    def getUlRlcThroughput(self):
+        return self.ulrlcthroughput
 
 
 class MacPacket(Parser):
@@ -118,17 +184,13 @@ class MacPacket(Parser):
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*DLUE STATS 1/.*x(\d)lF.*/1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) 10:(\d+)')
         self.count = 13
 
-    def readUlThroughputP1(self):
-        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 1/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)') # MAC
-        self.count = 12
-
     def readUlThroughputP2(self):
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 2/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) ') # MAC
         self.count = 12
     
     def getMacThroughput(self,macpacket,line):
-        macpacket.readReceivedData()
-        values = self.search(macpacket,line)
+        self.readReceivedData()
+        values = self.search(line)
         if(values!=()):
             (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
             if core not in self.macthroughput:
@@ -136,37 +198,26 @@ class MacPacket(Parser):
             t = ptime.Time(timestamp)
             self.macthroughput[core].append((t-0,ueGroup,fromByteToBit(int(receivedData))/2.0/1024))
 
-        macpacket.readUlThroughputP1()
-        values = self.search(macpacket,line)
-        if(values!=()):
-            (core,timestamp,ueGroup,recTBs,crcFails,msg3s,MacCEs,paddingData,NOK_MacHdrs,rlcPdus,rlcPduData,drbSdus)=values
-            if core not in self.ulrlcthroughput:
-                self.ulrlcthroughput[core] = []
-            t = ptime.Time(timestamp)
-            self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
-            self.receivedTBs += int(recTBs)
-            self.crcFails += int(crcFails)
-            self.msg3s += int(msg3s)
-            self.MacCEs += int(MacCEs)
-            self.paddingData += int(paddingData)
-            self.nokMacHeader += int(NOK_MacHdrs)
-            self.rlcPdus += int(rlcPdus)
-            self.drbSdus += int(drbSdus)
-
-        macpacket.readUlThroughputP2()
-        values = self.search(macpacket,line)
+        self.readUlThroughputP2()
+        values = self.search(line)
         if(values!=()):
             (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK_RlcHdrs,discPdus)=values
             if core not in self.ulmacthroughput:
                 self.ulmacthroughput[core] = []
             t = ptime.Time(timestamp)
             self.ulmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(drbSduData))/2.0/1024))
-            self.srbSduData    += int(srbSduData)
-            self.discardedPdu  += int(discPdus)
-            self.srbSdus       += int(srbSdus)
-            self.uplinkNack    += int(UlNack)
-            self.amPduSegments += int(AmPduSegments)
-            self.nokRlcHeader  += int(NOK_RlcHdrs)
-            self.forwardedSdus += int(forwardedSdus)
-            self.lostUmPdus    += int(lostUmPdus)
+            Common.srbSduData    += int(srbSduData)
+            Common.discardedPdu  += int(discPdus)
+            Common.srbSdus       += int(srbSdus)
+            Common.uplinkNack    += int(UlNack)
+            Common.amPduSegments += int(AmPduSegments)
+            Common.nokRlcHeader  += int(NOK_RlcHdrs)
+            Common.forwardedSdus += int(forwardedSdus)
+            Common.lostUmPdus    += int(lostUmPdus)
+
+    def getMACThroughput(self):
+        return self.macthroughput
+
+    def getUlMacThroughput(self):
+        return self.ulmacthroughput
         

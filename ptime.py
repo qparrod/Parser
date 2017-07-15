@@ -29,3 +29,22 @@ class Time:
 
     def __sub__(self,val):
         return self.time - timedelta(seconds=val)
+
+    def getCurrentTime(self):
+        self.currentTime = datetime.now()
+
+    def startTime(self):
+        self.start = datetime.now()
+
+    def getStartTime(self):
+        return self.start
+
+    def stopTime(self):
+        self.stop = datetime.now()
+
+    def getStopTime(self):
+        return self.stop
+
+    def getTotalTime(self):
+        return self.getStopTime() - self.getStartTime()
+

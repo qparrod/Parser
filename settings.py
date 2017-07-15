@@ -4,21 +4,46 @@ def init():
     global dpi
     global showgraph
     global verbose
+    global branch
     global clear
-    files = []
-    png = False
-    verbose = False
-    dpi = 50
-    showgraph = False
-    clear = False
+    global board
+    global deployment
+    global application
+    global cloud
+    global console
+    global graphAllowed
+    global programName
+    global syslogType
+    global workPathNeeded
+    global path
+
+    # program default values
+    files          = []
+    png            = False
+    verbose        = False
+    dpi            = 50
+    showgraph      = False
+    cloud          = False
+    clear          = False
+    console        = False
+    graphAllowed   = False
+    workPathNeeded = False
+    path           = ''
+    branch         = ''
+    programName    = 'parser.py'
+    board          = 'fsm3'
+    deployment     = 'cloud fsm3 6dsp'
+    application    = 'syslogAnalyzer'
+    syslogType     = 'udplog'
 
 
 class Color:
-    ok       = '\033[92m'
-    error    = '\033[91m'
-    warning  = '\033[93m'
-    bold     = '\033[1m'
-    nocolor  = '\033[0m'
+    ok         = '\033[92m'
+    error      = '\033[91m'
+    warning    = '\033[93m'
+    underline  = '\033[4m'
+    bold       = '\033[1m'
+    nocolor    = '\033[0m'
 
 
 class ProgressBar:

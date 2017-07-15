@@ -2,6 +2,7 @@
 
 import ptime
 import settings
+from settings import *
 
 class Graph:
     def __init__(self):
@@ -80,21 +81,23 @@ class Graph:
         return cores
 
     def draw(self,layer):
-        print "graph: draw {}".format(layer)
+        if settings.verbose : print "   graph: draw {}".format(layer)
         self.getData(layer)
 
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
-        l = 0
+        refLength = 0
+        refCore   = ''
         for core in self.data:
             for ueGroup in self.data[core]:
-                if (l ==0 ):
-                    l = len(self.data[core][ueGroup])
-                if (l!=0 and l!=len(self.data[core][ueGroup])):
-                    print "values of core {} have not same size: {} != {}".format(core, l,len(self.data[core][ueGroup]))
+                if (refLength ==0 ):
+                    refLength = len(self.data[core][ueGroup])
+                    refCore   = core
+                if (refLength!=0 and refLength!=len(self.data[core][ueGroup])):
+                    print Color.warning + "   Warning on {}: values of core {} have not same size then {}: {} != {}".format(layer, core, refCore, refLength, len(self.data[core][ueGroup])) + Color.nocolor
                     break
         
-        sumordinate = [0] * l
+        sumordinate = [0] * refLength
         dates = []
         for core in self.data:
             for ueGroup in self.data[core]:
@@ -107,9 +110,9 @@ class Graph:
 
                 plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
                 plt.title('{} throughput'.format(self.layer))
-                #plt.xticks( rotation=25 )
+                plt.xticks( rotation=25 )
 
-        plt.plot_date(dates[:l], sumordinate, '--',label='total throughput in kbps', linewidth=4)
+        plt.plot_date(dates[:refLength], sumordinate, '--',label='total throughput in kbps', linewidth=4)
         plt.legend()
         #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, shadow=True, borderaxespad=0.)
 
@@ -119,9 +122,10 @@ class Graph:
         import settings
 
         mydpi = settings.dpi 
-        print "drawFigure with dpi={}. This can take few seconds...".format(mydpi)
+        if settings.verbose : print "   DPI (dots per inch) for images set to {}.".format(mydpi)
+        print "   Creating figure. This can take few seconds..."
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
-        print "figure created"
+        print "   figure created"
         plt.subplot(3,2,1); self.draw('DL_PDCP')
         plt.subplot(3,2,2); self.draw('UL_PDCP')
         plt.subplot(3,2,3); self.draw('DL_RLC')

@@ -67,6 +67,10 @@ class Custom(Check):
         self.printResult()
 
 
+
+
+
+
 class Parser:
     def __init__(self):
         self.regex    = ''
@@ -74,122 +78,90 @@ class Parser:
         self.regex    = None
         self.count    = 0
 
-        self.srbSduData = 0
-        self.receivedTBs = 0
-        self.srbSdus = 0
-        self.crcFails = 0
-        self.msg3s = 0
-        self.MacCEs = 0
-        self.paddingData =0
-        self.nokMacHeader = 0
-        self.rlcPdus = 0
-        self.drbSdus = 0
-        self.lostUmPdus = 0
+    def search(self, _string):
+        m = self.regex.search(_string)
+        return (m.group(i+1) for i in range(self.count)) if m else ()
 
-        self.discardedPdu = 0
-        self.uplinkNack   = 0
-        self.amPduSegments = 0
-        self.nokRlcHeader = 0
-        self.forwardedSdus = 0
-
-        self.cpuload        = {}
-        
-        
-        
-        
-       
-    def search(self, parserType, _string):
-        m = parserType.regex.search(_string)
-        return (m.group(i+1) for i in range(parserType.count)) if m else ()
+    
 
 
 
-    '''
+class CpuLoad(Parser):
+    def __init__(self):
+        Parser.__init__(self)
+        self.cpuload = {} 
+
+    def read(self):
+        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*) max=(\d+\.?\d*)')
+        self.count = 4
+
+    def getCpuLoad(self):
+        return self.cpuload
+
     def getCpuLoadStats(self,cpuload,line):
         cpuload.read()
-        values = self.search(cpuload,line)
+        values = self.search(line)
         if(values!=()):
             (core,timestamp,load,max)=values
             if core not in self.cpuload:
                 self.cpuload[core] = []
             t = ptime.Time(timestamp)
             self.cpuload[core].append((t-0,float(load)))
-    '''
-        
 
+def getGlobalInformation():
+    settings.cloud = False
+    for filename in settings.files:
+        if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
+            with open(filename,'r') as f:
+                for line in f:
+                    if(re.search(r'VM-\d+.+',line)): settings.cloud=True
+                    m = re.search(r'Detected module (.*) and',line)
+                    if (m): settings.board = m.group(1)
+                    m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
+                    if (m): settings.deployment = m.group(1)
+            break
 
+def printGlobalInformation():
+    print '\033[1m'+'+'+'-'*60+'+'
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",settings.application,"|")
+    if (settings.cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",settings.board,"|")
+    print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",settings.deployment,"|")
+    print '+'+'-'*60+'+' + '\033[0m'
 
-    def printStatistics(self):
-        print Color.bold + '   Other statistics:' + Color.nocolor
-        pipe = Color.bold + "|" + Color.nocolor 
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
-        print Color.bold + '|          MAC                       |              RLC                  |' + Color.nocolor
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
-        print pipe + " total received TB      = {0:>8}  ".format(self.receivedTBs)  + pipe + "  total SRB SDUs        = {0:>8} ".format(self.srbSdus) + pipe
-        print pipe + " total CRC failures     = {0:>8}  ".format(self.crcFails)     + pipe + "  total SRB SDU data    = {0:>8} ".format(self.srbSduData) + pipe
-        print pipe + " total msg3s            = {0:>8}  ".format(self.msg3s)        + pipe + "  total UL NACK         = {0:>8} ".format(self.uplinkNack) + pipe
-        print pipe + " total MAC CEs          = {0:>8}  ".format(self.MacCEs)       + pipe + "  total lost UM PDUs    = {0:>8} ".format(self.lostUmPdus) + pipe
-        print pipe + " total paddingData      = {0:>8}  ".format(self.paddingData)  + pipe + "  total forwarded SDUs  = {0:>8} ".format(self.forwardedSdus) + pipe
-        print pipe + " total NOK Mac Headers  = {0:>8}  ".format(self.nokMacHeader) + pipe + "  total AM PDU segments = {0:>8} ".format(self.amPduSegments) + pipe
-        print pipe + " total RLC PDUs         = {0:>8}  ".format(self.rlcPdus)      + pipe + "  total NOK RLC Header  = {0:>8} ".format(self.nokRlcHeader) + pipe
-        print pipe + " total DRB SDUs         = {0:>8}  ".format(self.drbSdus)      + pipe + "  total discarded PDU   = {0:>8} ".format(self.discardedPdu) + pipe
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
-
-    
-'''
-    def getUlPdcpThroughput(self):
-        return self.ulpdcpthroughput
-
-    def getRLCThroughput(self):
-        return self.rlcthroughput
-
-    def getUlRlcThroughput(self):
-        return self.ulrlcthroughput
-
-    def getMACThroughput(self):
-        return self.macthroughput
-
-    def getUlMacThroughput(self):
-        return self.ulmacthroughput
-
-    def getCpuLoad(self):
-        return self.cpuload
-        '''
-
-
-
-class CpuLoad:
-    def __init__(self):
-        self.count = 0
-        self.regex = None
-
-    def read(self):
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*) max=(\d+\.?\d*)')
-        self.count = 4
-
-
-
-import sys
+def checkVersion():
+    import sys
+    if sys.version_info < (2,7):
+        print Color.error + 'must use python 2.7 or greater'
+        print 'possible solution: use "seesetenv LINSEE_BTS-5.7.0" command' + Color.nocolor
+        exit()
 
 def usage():
-    print "python test.py --application <application type> --board=<board type>"
+    print Color.underline + "Usage" + Color.nocolor + " :"
+    print "$ python2.7 {} --application <application type> --board=<board type>".format(settings.programName)
+    print "options:"
+    print "   -h|--help          show this usage"
+    print "   -v                 verbose mode"
+    print "   -w|--wcpy          set working copy name e.g /var/fpwork/user/<wcpy_name>/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    print "   -t|--type          set syslog type. SyslogAnalyzer will check all file with this type in filename. By default set to 'udplog'"
+    print "                      This could be also a file extension. For instance '.log' or '.txt'"
+    print "   -p|--path          instead of following working copy folder with -w option, this parameter set all path e.g /path/to/result/folder"
+    print "   -g                 enable graphical mode which open figures"
+    print "   -c                 show graphs on console. Mandatory use of -g option."
+    print "   --show             show figure exactly in the same way as -g option"
+    print "   -a|--application   choose tool to use. syslogAnalyzer by default which analysis udplogs"
+    print "   -b|--board         select which product to use. (fsmr3, Airscale...)"
+    print "   --clear            by default file analysis is stored in CSV file. If script is run again, this will regenarated analysis and CSV files"
+    print "   --png              enable creation of PNG image of figures. Need -g option or --show"
+    print "   --dpi              set DPI (dots per inch) for image. Need -g option or --show"
+    print "\nExample:\n python parser.py -v -p /home/user/project/result -g --clear --png --dpi 50 "
+    print " will analyse syslogs from /home/user/project/result folder and created a figure and saved it in a png image of dpi 50"
 
-
-def main(argv):
-    ResultFolderAlreadyRead = False
-    inputfile=''
-    application='syslogAnalyzer'
-    board='fsm3'
-    deployment = 'cloud fsm3 6dsp'
-    graphAllowed = False
-    workPathNeeded = False
-    console=False
-    branch = ''
-    path=''
-    settings.png = False
+def getArguments(argv):
+    import sys
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png","dpi=","show","clear"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:vt:",["application=","board=","wcpy=","png","dpi=","show","clear","type","path"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -199,99 +171,143 @@ def main(argv):
             usage()
             sys.exit()
         elif opt == '-v':
-            settings.verbose = True
+            settings.verbose      = True
         elif opt == '-g':
-            graphAllowed = True
+            settings.graphAllowed = True
         elif opt in ('-w','--wcpy'):
-            workPathNeeded = True
-            branch = arg
+            workPathNeeded        = True
+            settings.branch       = arg
         elif opt == '--dpi':
-            graphAllowed = True
-            settings.dpi = int(arg)
+            settings.graphAllowed = True
+            settings.dpi          = int(arg)
         elif opt == '--show':
-            graphAllowed = True
-            settings.showgraph = True
+            settings.graphAllowed = True
+            settings.showgraph    = True
         elif opt == '--clear':
-            settings.clear = True
-        elif opt in ('-p'):
-            path = arg
-        elif opt in ("-i"):
-            inputfile = arg
+            settings.clear        = True
+        elif opt in ('-p', "--path"):
+            settings.path         = arg
+        elif opt in ('-t', "--type"):
+            settings.syslogType   = arg
         elif opt in ("-a", "--application"):
-            application = arg
-            if application not in ("syslogAnalyzer","eventAnalyzer","comparePerf"):
-                print "wrong application: " + application
+            settings.application  = arg
+            if settings.application not in ("syslogAnalyzer","eventAnalyzer","comparePerf"):
+                print Color.error + "wrong application: " + settings.application + Color.nocolor
                 sys.exit()
         elif opt in("--png"):
-            graphAllowed = True
-            settings.png = True
+            settings.graphAllowed = True
+            settings.png          = True
         elif opt in ("-b", "--board"):
-            board = arg
-            if board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):
-                print "wrong board type: " + board
+            settings.board        = arg
+            if settings.board not in ("fsm3","fsm4","fsmr3","fsmr4","airscale","Airscale","dsp","arm","kepler"):
+                print "wrong board type: " + settings.board
                 sys.exit()
         elif opt == '-c':
-            console = True
+            settings.console = True
 
-    
-    # check all files in results folder
+def printSelectedArguments():
+    if settings.verbose:
+        print "option selected :"
+        print "    verbose mode activated (-v)"
+        if settings.clear : print "    regenerating CSV file selected (--clear)"
+        if settings.graphAllowed : print "    graph generation selected (-g or --show)"
+        if settings.branch != '' : print "    working {} copy selected (-w)".format(settings.branch)
+        if settings.png : print "    PNG image to create (--png)"
+        if settings.syslogType != 'udplog' : print "    file type is {} (-t)".format(settings.syslogType)
+        else : print "    file type is udplog [default]"
+        if settings.graphAllowed and settings.dpi != 50  : print "    DPI set to {} (--dpi)".format(settings.dpi)
+        elif settings.graphAllowed and settings.dpi == 50 : print "    DPI set to 50 [default]"
+        if settings.path !='' : print "    path '{}'' selected (-p)".format(settings.path)
+        if settings.graphAllowed and settings.console : print "    graph will be displayed on console (-c)"
+
+
+def isFolderAlreadyAnalyzed():
     import os
-    if path =='':
-        if not workPathNeeded:
-            path = "/home/quentin/Python/Parser/results"
-        else:
-            user = os.getlogin()
-            path = "/var/fpwork/"+ str(user) + "/"+branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
-    print "path=" + path
+    ResultFolderAlreadyRead = True
+    if settings.verbose : print "Checking if result folder has already been checked"
+    if os.path.isfile('fileHistory.txt') :
+        fileHistory = open('fileHistory.txt','r')
+        if settings.verbose : print "open history files"
+        for line in fileHistory:
+            line  = line.rstrip('\n')
+            found = False
+            for filename in settings.files:
+                if line == filename:
+                    found = True;
+                    break
+            if(not found):
+                ResultFolderAlreadyRead = False
+        fileHistory.close()
+    if settings.verbose : print "Result already read: {}".format(ResultFolderAlreadyRead)
+    return ResultFolderAlreadyRead and not settings.clear
 
-    import sys
-    if sys.version_info < (2,7):
-        print '\033[91m'+ 'must use python 2.7 or greater'
-        print 'possible solution: use "seesetenv LINSEE_BTS-5.7.0" command' + '\033[0m'
+def checkFileNumber():
+    if settings.verbose : print "checking file number..."
+    nofiles = len(settings.files) 
+    if (nofiles==0):
+        print Color.error + "no file in path" + Color.nocolor
+        exit();
+    if settings.verbose : print "number of files in path: {}".format(nofiles)
+
+def checkFileType():
+    count = 0
+    for filename in settings.files:
+        if settings.syslogType in filename:
+            count += 1
+    if count != 0 : 
+        if settings.verbose : print "Number of files in path with pattern '{}'".format(count,settings.syslogType)
+    else:
+        print Color.error + "\nThere are no file to analyze with pattern '{}'".format(settings.syslogType)
+        print "List of files in path selected :\n"
+        print settings.files
+        print "\nTake care of file pattern to analyze. Use '-t' or '--type=' option to select file pattern (see help for more information)\n" + Color.nocolor
         exit()
 
-    for dirpath, dirnames, filenames in os.walk(path):
+def setPath():
+    if settings.path =='':
+        if not settings.workPathNeeded:
+            settings.path = "/home/quentin/Python/Parser/results"
+        else:
+            import os
+            user = os.getlogin()
+            settings.path = "/var/fpwork/"+ str(user) + "/"+settings.branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
+    print "reference folder path for analysis : " + Color.bold + settings.path + Color.nocolor
+
+def main(argv):
+    import os
+    os.system('clear')
+
+    getArguments(argv)
+
+    print Color.underline + "Starting {} tool\n".format(settings.application) + Color.nocolor
+
+    printSelectedArguments()
+
+    setPath()
+
+    checkVersion()
+
+    for dirpath, dirnames, filenames in os.walk(settings.path):
         if(dirnames!=[]):
             emTrace='activated'
             emTraceFolderName = dirnames[0]
         settings.files = [os.path.join(dirpath,name) for name in filenames]
         break
    
-    nofiles = len(settings.files) 
-    if (nofiles==0):
-        print '\033[91m' + "no file in path" + '\033[0m'
-        exit();
-    print "number of files in path: {0}".format(nofiles)
+    checkFileNumber()
+    checkFileType()
 
     settings.files.sort()
 
-    if (os.path.isfile('fileHistory.txt') and not settings.clear):
-        fileHistory = open('fileHistory.txt','r')
-        print "open history files"
-        ResultFolderAlreadyRead = True
-        for line in fileHistory:
-            line = line.rstrip('\n')
-            found = False
-            for e in settings.files:
-                if line == e:
-                    found = True;
-                    break
-            if(not found):
-                ResultFolderAlreadyRead = False
-
-        fileHistory.close()
-
-    print "Result already read: {}".format(ResultFolderAlreadyRead)
-
-
-    if not ResultFolderAlreadyRead : 
+    if not isFolderAlreadyAnalyzed() : 
         fileHistory = open('fileHistory.txt','w')
-        udplognb = 0
+        count = 0
         for filename in settings.files:
-            if ( re.search(r'.*udplog_.*',filename) ):
-                udplognb=udplognb+1
+            if settings.syslogType in filename:
+                count += 1
                 fileHistory.write(filename+'\n')
-        print "number of udplog files in path: {}".format(udplognb)
+        fileHistory.close()
+        if settings.verbose : print "number of '{}' files in path: {}".format(settings.syslogType,count)
 
     
         csvDirectory='csv'
@@ -313,37 +329,21 @@ def main(argv):
         os.makedirs(directory+'/'+throughputDirectory)
         os.makedirs(directory+'/'+cpuloadDirectory)
 
-        ## check board type and deployment from startup log
-        cloud = False
-        for filename in settings.files:
-            if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
-                with open(filename,'r') as f:
-                    for line in f:
-                        if(re.search(r'VM-\d+.+',line)): cloud=True
-                        m = re.search(r'Detected module (.*) and',line)
-                        if (m): board = m.group(1)
-                        m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
-                        if (m): deployment = m.group(1)
-                break
-                            
-        print '\033[1m'+'+'+'-'*60+'+'
-        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",application,"|")
-        if (cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
-        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",board,"|")
-        print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",deployment,"|")
-        print '+'+'-'*60+'+' + '\033[0m'
-
-
-        from datetime import datetime
+        # check board type and deployment from startup log
+        getGlobalInformation()
+        printGlobalInformation()
 
         pdcppacket = PdcpPacket()
-        #rlcpacket  = RlcPacket()
-        #macpacket  = MacPacket()
-        #cpuload    = CpuLoad()
+        rlcpacket  = RlcPacket()
+        macpacket  = MacPacket()
+        cpuload    = CpuLoad()
+        commonStats = Common()
 
-        totalTime = datetime.now() 
+        from datetime import datetime
+        totalTime = datetime.now()
         for filename in settings.files:
-            if ( re.search(r'.*udplog_.*',filename) ):
+            #if ( re.search(r'.*udplog_.*'.format(settings.syslogType),filename) ):
+            if settings.syslogType in filename:
                 print "\nread filename : " + filename
                 Bar = ProgressBar(file_len(filename),60, ' ')
                 d = datetime.now()
@@ -354,10 +354,10 @@ def main(argv):
                         if (lineNumber%2000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
-                        #self.getCpuLoadStats(cpuload,line)
+                        cpuload.getCpuLoadStats(cpuload,line)
                         pdcppacket.getPdcpThroughputFromLine(pdcppacket,line)
-                        #self.getRlcThroughput(rlcpacket,line)
-                        #self.getMacThroughput(macpacket,line)
+                        rlcpacket.getRlcThroughput(rlcpacket,line)
+                        macpacket.getMacThroughput(macpacket,line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -366,27 +366,32 @@ def main(argv):
                 Error  (filename)
                 Custom (filename)
         totalTime = datetime.now() - totalTime
-        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+        print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
 
-
-
+        commonStats.printStatistics()
 
         createCsvThroughput('DL_PDCP',pdcppacket.getPDCPThroughput())
-        #createCsvThroughput('UL_PDCP',parser.getUlPdcpThroughput())
-        #createCsvThroughput('DL_RLC',parser.getRLCThroughput())
-        #createCsvThroughput('UL_RLC',parser.getUlRlcThroughput())
-        #createCsvThroughput('DL_MAC',parser.getMACThroughput())
-        #createCsvThroughput('UL_MAC',parser.getUlMacThroughput())
+        createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
+        createCsvThroughput('DL_RLC',rlcpacket.getRLCThroughput())
+        createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
+        createCsvThroughput('DL_MAC',macpacket.getMACThroughput())
+        createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
 
-        #createCsvLoad(parser.getCpuLoad())
+        createCsvLoad(cpuload.getCpuLoad())
+    else:
+        print "\nResult folder already read and CSV for throughput and CPU load created."
+        print "You can check files in csv folder where python script source file is present."
 
-    if (graphAllowed):
+    if settings.graphAllowed:
         import graph
+        print "\ndrawing graph mode has been set. Plotting graph..."
         g = graph.Graph()
         if console:
             g.drawConsole('PDCP')
         else:
             g.drawFigure()
+
+    print ""
 
 def getAllUeGroup(data):
     ueGroups = []
@@ -412,7 +417,7 @@ def filtering(data):
 
 def createCsv(name,type,data):
     if data == {}:
-        print "\033[91mno data collected for {} {}\033[0m".format(name,type)
+        if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
         return
     for core in data:
         directory = ''
@@ -456,7 +461,7 @@ def createCsv(name,type,data):
             for line in data[core]:
                 writer.writerow(line)
             fd.close()
-    print "CSV file created for {} {}".format(name,type)
+    if settings.verbose : print "CSV file created for {} {}".format(name,type)
 
 def createCsvThroughput(layerName,data):
     createCsv(layerName,'throughput',data)
@@ -467,4 +472,5 @@ def createCsvLoad(data):
 
 if __name__ == "__main__":
     settings.init()
+    import sys
     main(sys.argv[1:])  
