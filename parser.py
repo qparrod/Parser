@@ -11,6 +11,7 @@ class Color:
     ok       = '\033[92m'
     error    = '\033[91m'
     warning  = '\033[93m'
+    bold     = '\033[1m'
     nocolor  = '\033[0m'
 
 
@@ -37,6 +38,8 @@ class ProgressBar:
             time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
 
         sys.stdout.write(out)
+
+        if perc == 100 : sys.stdout.write('\n')
         sys.stdout.flush()
 
 def file_len(fname):
@@ -59,43 +62,47 @@ class Check:
         self.type      = ''
         self.pattern   = ''
 
-    def checkFile(self):
-        fd = open(self.type + self.extension,'w')
-        for filename in settings.files:
-            if 'udplog' not in filename: continue
-            tmpcount = 0
-            print "check {} in {}".format(self.type,filename)
-            with open(filename,'r') as f:
-                for line in f:
-                    if re.search(r'{}'.format(self.pattern),line):
+    def checkFile(self, path):
+        fd = open(self.type + self.extension,'a')
+        with open(path,'r') as f:
+            for line in f:
+                for pattern in self.patterns:
+                    if re.search(r'{}'.format(pattern),line):
                         self.count += 1
-                        tmpcount += 1
                         fd.write(line)
-            print "{} {}".format(tmpcount,self.type)
         fd.close()
 
     def printResult(self):
         if self.count == 0:
             print Color.ok + "No {}".format(self.type) + Color.nocolor
         else:
-            print Color.error + "Number of {} : {}".format(self.type,self.count) + Color.nocolor
+            print "Number of {0:<7} : {1:}".format(self.type,self.count)
         
 
 class Warning(Check):
-    def __init__(self):
+    def __init__(self,path):
         Check.__init__(self)
-        self.type    = 'warning'
-        self.pattern = 'WRN'
-        self.checkFile()
+        self.type     = 'warning'
+        self.patterns = ['WRN','Warning','WARNING']
+        self.checkFile(path)
         self.printResult()
 
 class Error(Check):
-    def __init__(self):
+    def __init__(self,path):
         Check.__init__(self)
-        self.type    = 'error'
-        self.pattern = 'ERR'
-        self.checkFile()
+        self.type     = 'error'
+        self.patterns = ['ERR','error','ERROR']
+        self.checkFile(path)
         self.printResult()
+
+class Custom(Check):
+    def __init__(self,path):
+        Check.__init__(self)
+        self.type     = "custom"
+        self.patterns = ['long event detected']
+        self.checkFile(path)
+        self.printResult()
+
 
 class Parser:
     def __init__(self):
@@ -178,15 +185,31 @@ class Parser:
                 self.ulrlcthroughput[core] = []
             t = ptime.Time(timestamp)
             self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
+            self.receivedTBs += int(recTBs)
+            self.crcFails += int(crcFails)
+            self.msg3s += int(msg3s)
+            self.MacCEs += int(MacCEs)
+            self.paddingData += int(paddingData)
+            self.nokMacHeader += int(NOK_MacHdrs)
+            self.rlcPdus += int(rlcPdus)
+            self.drbSdus += int(drbSdus)
 
         macpacket.readUlThroughputP2()
         values = self.search(macpacket,line)
         if(values!=()):
-            (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK,RlcHdrs,discPdus)=values
+            (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK_RlcHdrs,discPdus)=values
             if core not in self.ulmacthroughput:
                 self.ulmacthroughput[core] = []
             t = ptime.Time(timestamp)
             self.ulmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(drbSduData))/2.0/1024))
+            self.srbSduData    += int(srbSduData)
+            self.discardedPdu  += int(discPdus)
+            self.srbSdus       += int(srbSdus)
+            self.uplinkNack    += int(UlNack)
+            self.amPduSegments += int(AmPduSegments)
+            self.nokRlcHeader  += int(NOK_RlcHdrs)
+            self.forwardedSdus += int(forwardedSdus)
+            self.lostUmPdus    += int(lostUmPdus)
 
 
     def getCpuLoadStats(self,cpuload,line):
@@ -208,6 +231,23 @@ class Parser:
         macpacket = MacPacket()
         cpuload    = CpuLoad()
 
+        self.srbSduData = 0
+        self.receivedTBs = 0
+        self.srbSdus = 0
+        self.crcFails = 0
+        self.msg3s = 0
+        self.MacCEs = 0
+        self.paddingData =0
+        self.nokMacHeader = 0
+        self.rlcPdus = 0
+        self.drbSdus = 0
+        self.lostUmPdus = 0
+
+        self.discardedPdu = 0
+        self.uplinkNack   = 0
+        self.amPduSegments = 0
+        self.nokRlcHeader = 0
+        self.forwardedSdus = 0
         self.cpuload        = {}
         self.pdcpthroughput = {}
         self.ulpdcpthroughput = {}
@@ -237,9 +277,25 @@ class Parser:
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
                     Bar.update(lineNumber,datetime.now() - d)
+                Warning(filename)
+                Error  (filename)
+                Custom (filename)
         totalTime = datetime.now() - totalTime
-        print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
-        
+        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+        print Color.bold + '   Other statistics:' + Color.nocolor
+        pipe = Color.bold + "|" + Color.nocolor 
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+        print Color.bold + '|          MAC                       |              RLC                  |' + Color.nocolor
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+        print pipe + " total received TB      = {0:>8}  ".format(self.receivedTBs)  + pipe + "  total SRB SDUs        = {0:>8} ".format(self.srbSdus) + pipe
+        print pipe + " total CRC failures     = {0:>8}  ".format(self.crcFails)     + pipe + "  total SRB SDU data    = {0:>8} ".format(self.srbSduData) + pipe
+        print pipe + " total msg3s            = {0:>8}  ".format(self.msg3s)        + pipe + "  total UL NACK         = {0:>8} ".format(self.uplinkNack) + pipe
+        print pipe + " total MAC CEs          = {0:>8}  ".format(self.MacCEs)       + pipe + "  total lost UM PDUs    = {0:>8} ".format(self.lostUmPdus) + pipe
+        print pipe + " total paddingData      = {0:>8}  ".format(self.paddingData)  + pipe + "  total forwarded SDUs  = {0:>8} ".format(self.forwardedSdus) + pipe
+        print pipe + " total NOK Mac Headers  = {0:>8}  ".format(self.nokMacHeader) + pipe + "  total AM PDU segments = {0:>8} ".format(self.amPduSegments) + pipe
+        print pipe + " total RLC PDUs         = {0:>8}  ".format(self.rlcPdus)      + pipe + "  total NOK RLC Header  = {0:>8} ".format(self.nokRlcHeader) + pipe
+        print pipe + " total DRB SDUs         = {0:>8}  ".format(self.drbSdus)      + pipe + "  total discarded PDU   = {0:>8} ".format(self.discardedPdu) + pipe
+        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
 
     def getPDCPThroughput(self):
         return self.pdcpthroughput
@@ -264,7 +320,7 @@ class Parser:
 
 
 
-class CpuLoad():
+class CpuLoad:
     def __init__(self):
         self.count = 0
         self.regex = None
@@ -273,12 +329,6 @@ class CpuLoad():
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.+)>.*CPU_Load=(\d+\.?\d*) max=(\d+\.?\d*)')
         self.count = 4
 
-
-class PoolStats(Parser):
-    def __init__(self):
-        Parser.__init__(self)
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/EventPools: P: (\d+).*(\d*.?\d*)C: (\d+) LB: (\d+) L: (\d+) NB: (\d+).*(\d*).*(\d*).*(\d*).*(\d*).*(\d*)')  
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*STATS/SduPools: SRB:(\d+/\d+) SDU1:(\d+) SDU2:(\d+) .+ fully used:(\d*/\d*)')
 
 
 import sys
@@ -301,7 +351,7 @@ def main(argv):
     settings.png = False
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png","dpi=","show"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:v",["application=","board=","wcpy=","png","dpi=","show","clear"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -318,9 +368,13 @@ def main(argv):
             workPathNeeded = True
             branch = arg
         elif opt == '--dpi':
+            graphAllowed = True
             settings.dpi = int(arg)
         elif opt == '--show':
+            graphAllowed = True
             settings.showgraph = True
+        elif opt == '--clear':
+            settings.clear = True
         elif opt in ('-p'):
             path = arg
         elif opt in ("-i"):
@@ -331,6 +385,7 @@ def main(argv):
                 print "wrong application: " + application
                 sys.exit()
         elif opt in("--png"):
+            graphAllowed = True
             settings.png = True
         elif opt in ("-b", "--board"):
             board = arg
@@ -372,7 +427,7 @@ def main(argv):
 
     settings.files.sort()
 
-    if (os.path.isfile('fileHistory.txt')):
+    if (os.path.isfile('fileHistory.txt') and not settings.clear):
         fileHistory = open('fileHistory.txt','r')
         print "open history files"
         ResultFolderAlreadyRead = True
@@ -407,6 +462,13 @@ def main(argv):
             import shutil
             shutil.rmtree(directory)
         os.makedirs(directory)
+        
+        if os.path.isfile('error.txt'):
+            if settings.verbose : print "delete error.txt"
+            os.remove('error.txt')
+        if os.path.isfile('warning.txt'):
+            if settings.verbose : print "delete warning.txt"
+            os.remove('warning.txt')
 
         throughputDirectory='throughput'
         cpuloadDirectory='cpuload'
@@ -445,9 +507,6 @@ def main(argv):
         createCsvThroughput('UL_MAC',parser.getUlMacThroughput())
 
         createCsvLoad(parser.getCpuLoad())
-
-        Warning()
-        Error()
 
     if (graphAllowed):
         import graph
