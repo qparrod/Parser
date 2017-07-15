@@ -2,45 +2,13 @@
 
 import re
 from layers import *
+#from pool import PoolStats
 from csvWriter import Csv
 import settings
+from settings import Color,ProgressBar
 import csv
-import ptime
+#import ptime
 
-class Color:
-    ok       = '\033[92m'
-    error    = '\033[91m'
-    warning  = '\033[93m'
-    bold     = '\033[1m'
-    nocolor  = '\033[0m'
-
-
-class ProgressBar:
-    def __init__ (self, valmax, maxbar, title):
-        if valmax == 0:  valmax = 1
-        if maxbar > 200: maxbar = 200
-        self.valmax = valmax
-        self.maxbar = maxbar
-        self.title  = title
-    
-    def update(self, val, time):
-        import sys
-        perc  = int(round((float(val) / float(self.valmax)) * 100))
-        scale = 100.0 / float(self.maxbar)
-        bar   = int(perc / scale)
- 
-        color = ''
-
-        if (perc!=100): color = Color.nocolor
-        else:           color = Color.ok
-
-        out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),
-            time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
-
-        sys.stdout.write(out)
-
-        if perc == 100 : sys.stdout.write('\n')
-        sys.stdout.flush()
 
 def file_len(fname):
     with open(fname) as f:
@@ -48,11 +16,6 @@ def file_len(fname):
             pass
     return i + 1
 
-def fromBitToByte(val):
-    return int(val / 8)
-
-def fromByteToBit(val):
-    return val * 8
 
 
 class Check:
@@ -110,126 +73,6 @@ class Parser:
         self.files    = settings.files
         self.regex    = None
         self.count    = 0
-       
-    def search(self, parserType, _string):
-        m = parserType.regex.search(_string)
-        return (m.group(i+1) for i in range(parserType.count)) if m else ()
-
-    def getPdcpThroughput(self,pdcppacket,line):
-        pdcppacket.setDl()
-        values = self.search(pdcppacket,line)
-        if(values!=()):
-            (soc, core,timestamp, s1, x2, inbytes, toRlc, inbytesRLC, ack, nack) = values
-            values = [int(s) for s in inbytes.split() if s.isdigit()]
-            if core not in self.pdcpthroughput:
-                self.pdcpthroughput[core] = []
-            t = ptime.Time(timestamp)
-            timeDelta = 2.0 # 2 seconds between traces
-            for i in reversed(range(len(values))):
-                self.pdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
-
-        pdcppacket.setUl()
-        values = self.search(pdcppacket,line)
-        if(values!=()):
-            (soc,core,timestamp,data) = values
-            values = [ int(s) for s in data.split() if s.isdigit() ]
-            if core not in self.ulpdcpthroughput:
-                self.ulpdcpthroughput[core] = []
-            t = ptime.Time(timestamp)
-            timeDelta = 2.0
-            for i in reversed(range(len(values))):
-                self.ulpdcpthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
-
-
-    def getRlcThroughput(self,rlcpacket,line):
-        rlcpacket.readRcvdRcvp()
-        values = self.search(rlcpacket,line)
-        if(values!=()):
-            (core,timestamp,rcvd,rcvp,ackd,ackp)=values
-            values = [int(s) for s in rcvd.split() if s.isdigit()]
-            if core not in self.rlcthroughput:
-                self.rlcthroughput[core] = []
-            t = ptime.Time(timestamp)
-            timeDelta = 2.0 # 2 seconds between traces
-            for i in reversed(range(len(values))):
-                self.rlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
-        ''' 
-        rlcpacket.readUlRcvdRcvp()
-        values = self.search(rlcpacket,line)
-        if(values!=()):
-            (core,timestamp,data)=values
-            values = [int(s) for s in data.split() if s.isdigit()]
-            if core not in self.ulrlcthroughput:
-                self.ulrlcthroughput[core] = []
-            t = ptime.Time(timestamp)
-            timeDelta = 2.0 # 2 seconds between traces
-            for i in reversed(range(len(values))):
-                self.ulrlcthroughput[core].append((t-timeDelta*i,fromByteToBit(values[len(values)-1-i])/timeDelta/1024))
-        '''
-
-    def getMacThroughput(self,macpacket,line):
-        macpacket.readReceivedData()
-        values = self.search(macpacket,line)
-        if(values!=()):
-            (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
-            if core not in self.macthroughput:
-                self.macthroughput[core] = []
-            t = ptime.Time(timestamp)
-            self.macthroughput[core].append((t-0,ueGroup,fromByteToBit(int(receivedData))/2.0/1024))
-
-        macpacket.readUlThroughputP1()
-        values = self.search(macpacket,line)
-        if(values!=()):
-            (core,timestamp,ueGroup,recTBs,crcFails,msg3s,MacCEs,paddingData,NOK_MacHdrs,rlcPdus,rlcPduData,drbSdus)=values
-            if core not in self.ulrlcthroughput:
-                self.ulrlcthroughput[core] = []
-            t = ptime.Time(timestamp)
-            self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
-            self.receivedTBs += int(recTBs)
-            self.crcFails += int(crcFails)
-            self.msg3s += int(msg3s)
-            self.MacCEs += int(MacCEs)
-            self.paddingData += int(paddingData)
-            self.nokMacHeader += int(NOK_MacHdrs)
-            self.rlcPdus += int(rlcPdus)
-            self.drbSdus += int(drbSdus)
-
-        macpacket.readUlThroughputP2()
-        values = self.search(macpacket,line)
-        if(values!=()):
-            (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK_RlcHdrs,discPdus)=values
-            if core not in self.ulmacthroughput:
-                self.ulmacthroughput[core] = []
-            t = ptime.Time(timestamp)
-            self.ulmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(drbSduData))/2.0/1024))
-            self.srbSduData    += int(srbSduData)
-            self.discardedPdu  += int(discPdus)
-            self.srbSdus       += int(srbSdus)
-            self.uplinkNack    += int(UlNack)
-            self.amPduSegments += int(AmPduSegments)
-            self.nokRlcHeader  += int(NOK_RlcHdrs)
-            self.forwardedSdus += int(forwardedSdus)
-            self.lostUmPdus    += int(lostUmPdus)
-
-
-    def getCpuLoadStats(self,cpuload,line):
-        cpuload.read()
-        values = self.search(cpuload,line)
-        if(values!=()):
-            (core,timestamp,load,max)=values
-            if core not in self.cpuload:
-                self.cpuload[core] = []
-            t = ptime.Time(timestamp)
-            self.cpuload[core].append((t-0,float(load)))
-
-
-    def read(self):
-        from datetime import datetime
-
-        rlcpacket  = RlcPacket()
-        pdcppacket = PdcpPacket()
-        macpacket = MacPacket()
-        cpuload    = CpuLoad()
 
         self.srbSduData = 0
         self.receivedTBs = 0
@@ -248,40 +91,35 @@ class Parser:
         self.amPduSegments = 0
         self.nokRlcHeader = 0
         self.forwardedSdus = 0
+
         self.cpuload        = {}
-        self.pdcpthroughput = {}
-        self.ulpdcpthroughput = {}
-        self.rlcthroughput  = {}
-        self.ulrlcthroughput = {}
-        self.macthroughput  = {}
-        self.ulmacthroughput = {}
         
-        totalTime = datetime.now() 
-        for filename in self.files:
-            if ( re.search(r'.*udplog_.*',filename) ):
-                print "\nread filename : " + filename
-                Bar = ProgressBar(file_len(filename),60, ' ')
-                d = datetime.now()
-                with open(filename) as f:
-                    lineNumber=0
-                    for line in f:
-                        lineNumber=lineNumber+1
-                        if (lineNumber%2000==0):
-                            Bar.update(lineNumber,datetime.now() - d)
+        
+        
+        
+       
+    def search(self, parserType, _string):
+        m = parserType.regex.search(_string)
+        return (m.group(i+1) for i in range(parserType.count)) if m else ()
 
-                        self.getCpuLoadStats(cpuload,line)
-                        self.getPdcpThroughput(pdcppacket,line)
-                        self.getRlcThroughput(rlcpacket,line)
-                        self.getMacThroughput(macpacket,line)
 
-                        #PHY stub
-                        # CBitrate:: ... Kilobits pers second on CellId.. 
-                    Bar.update(lineNumber,datetime.now() - d)
-                Warning(filename)
-                Error  (filename)
-                Custom (filename)
-        totalTime = datetime.now() - totalTime
-        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+
+    '''
+    def getCpuLoadStats(self,cpuload,line):
+        cpuload.read()
+        values = self.search(cpuload,line)
+        if(values!=()):
+            (core,timestamp,load,max)=values
+            if core not in self.cpuload:
+                self.cpuload[core] = []
+            t = ptime.Time(timestamp)
+            self.cpuload[core].append((t-0,float(load)))
+    '''
+        
+
+
+
+    def printStatistics(self):
         print Color.bold + '   Other statistics:' + Color.nocolor
         pipe = Color.bold + "|" + Color.nocolor 
         print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
@@ -297,9 +135,8 @@ class Parser:
         print pipe + " total DRB SDUs         = {0:>8}  ".format(self.drbSdus)      + pipe + "  total discarded PDU   = {0:>8} ".format(self.discardedPdu) + pipe
         print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
 
-    def getPDCPThroughput(self):
-        return self.pdcpthroughput
-
+    
+'''
     def getUlPdcpThroughput(self):
         return self.ulpdcpthroughput
 
@@ -317,6 +154,7 @@ class Parser:
 
     def getCpuLoad(self):
         return self.cpuload
+        '''
 
 
 
@@ -496,17 +334,51 @@ def main(argv):
         print '+'+'-'*60+'+' + '\033[0m'
 
 
-        parser=Parser()
-        parser.read()
+        from datetime import datetime
 
-        createCsvThroughput('DL_PDCP',parser.getPDCPThroughput())
-        createCsvThroughput('UL_PDCP',parser.getUlPdcpThroughput())
-        createCsvThroughput('DL_RLC',parser.getRLCThroughput())
-        createCsvThroughput('UL_RLC',parser.getUlRlcThroughput())
-        createCsvThroughput('DL_MAC',parser.getMACThroughput())
-        createCsvThroughput('UL_MAC',parser.getUlMacThroughput())
+        pdcppacket = PdcpPacket()
+        #rlcpacket  = RlcPacket()
+        #macpacket  = MacPacket()
+        #cpuload    = CpuLoad()
 
-        createCsvLoad(parser.getCpuLoad())
+        totalTime = datetime.now() 
+        for filename in settings.files:
+            if ( re.search(r'.*udplog_.*',filename) ):
+                print "\nread filename : " + filename
+                Bar = ProgressBar(file_len(filename),60, ' ')
+                d = datetime.now()
+                with open(filename) as f:
+                    lineNumber=0
+                    for line in f:
+                        lineNumber=lineNumber+1
+                        if (lineNumber%2000==0):
+                            Bar.update(lineNumber,datetime.now() - d)
+
+                        #self.getCpuLoadStats(cpuload,line)
+                        pdcppacket.getPdcpThroughputFromLine(pdcppacket,line)
+                        #self.getRlcThroughput(rlcpacket,line)
+                        #self.getMacThroughput(macpacket,line)
+
+                        #PHY stub
+                        # CBitrate:: ... Kilobits pers second on CellId.. 
+                    Bar.update(lineNumber,datetime.now() - d)
+                Warning(filename)
+                Error  (filename)
+                Custom (filename)
+        totalTime = datetime.now() - totalTime
+        print "   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
+
+
+
+
+        createCsvThroughput('DL_PDCP',pdcppacket.getPDCPThroughput())
+        #createCsvThroughput('UL_PDCP',parser.getUlPdcpThroughput())
+        #createCsvThroughput('DL_RLC',parser.getRLCThroughput())
+        #createCsvThroughput('UL_RLC',parser.getUlRlcThroughput())
+        #createCsvThroughput('DL_MAC',parser.getMACThroughput())
+        #createCsvThroughput('UL_MAC',parser.getUlMacThroughput())
+
+        #createCsvLoad(parser.getCpuLoad())
 
     if (graphAllowed):
         import graph
