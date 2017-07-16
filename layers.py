@@ -30,20 +30,29 @@ class Common(Parser):
 
     def printStatistics(self):
         from settings import Color
-        print Color.bold + '   Other statistics:' + Color.nocolor
         pipe = Color.bold + "|" + Color.nocolor 
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
-        print Color.bold + '|          MAC                       |              RLC                  |' + Color.nocolor
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
-        print pipe + " total received TB      = {0:<8}  ".format(Common.receivedTBs)  + pipe + "  total SRB SDUs        = {0:<8} ".format(Common.srbSdus)       + pipe
-        print pipe + " total CRC failures     = {0:<8}  ".format(Common.crcFails)     + pipe + "  total SRB SDU data    = {0:<8} ".format(Common.srbSduData)    + pipe
-        print pipe + " total msg3s            = {0:<8}  ".format(Common.msg3s)        + pipe + "  total UL NACK         = {0:<8} ".format(Common.uplinkNack)    + pipe
-        print pipe + " total MAC CEs          = {0:<8}  ".format(Common.MacCEs)       + pipe + "  total lost UM PDUs    = {0:<8} ".format(Common.lostUmPdus)    + pipe
-        print pipe + " total paddingData      = {0:<8}  ".format(Common.paddingData)  + pipe + "  total forwarded SDUs  = {0:<8} ".format(Common.forwardedSdus) + pipe
-        print pipe + " total NOK Mac Headers  = {0:<8}  ".format(Common.nokMacHeader) + pipe + "  total AM PDU segments = {0:<8} ".format(Common.amPduSegments) + pipe
-        print pipe + " total RLC PDUs         = {0:<8}  ".format(Common.rlcPdus)      + pipe + "  total NOK RLC Header  = {0:<8} ".format(Common.nokRlcHeader)  + pipe
-        print pipe + " total DRB SDUs         = {0:<8}  ".format(Common.drbSdus)      + pipe + "  total discarded PDU   = {0:<8} ".format(Common.discardedPdu)  + pipe
-        print Color.bold + '+------------------------------------+-----------------------------------+' + Color.nocolor
+        stats =  Color.bold + "   Other statistics:\n" \
+        + "+-------------------------------------+-------------------------------------+\n" \
+        + "|              MAC                    |              RLC                    |\n"\
+        + "+-------------------------------------+-------------------------------------+\n"+ Color.nocolor\
+        + pipe + "  total received TB      = {0:<8}  ".format(Common.receivedTBs)   \
+        + pipe + "  total SRB SDUs         = {0:<8}  ".format(Common.srbSdus)       + pipe + '\n'\
+        + pipe + "  total CRC failures     = {0:<8}  ".format(Common.crcFails)      \
+        + pipe + "  total SRB SDU data     = {0:<8}  ".format(Common.srbSduData)    + pipe + '\n' \
+        + pipe + "  total msg3s            = {0:<8}  ".format(Common.msg3s)         \
+        + pipe + "  total UL NACK          = {0:<8}  ".format(Common.uplinkNack)    + pipe + '\n' \
+        + pipe + "  total MAC CEs          = {0:<8}  ".format(Common.MacCEs)        \
+        + pipe + "  total lost UM PDUs     = {0:<8}  ".format(Common.lostUmPdus)    + pipe + '\n' \
+        + pipe + "  total paddingData      = {0:<8}  ".format(Common.paddingData)   \
+        + pipe + "  total forwarded SDUs   = {0:<8}  ".format(Common.forwardedSdus) + pipe + '\n' \
+        + pipe + "  total NOK Mac Headers  = {0:<8}  ".format(Common.nokMacHeader)  \
+        + pipe + "  total AM PDU segments  = {0:<8}  ".format(Common.amPduSegments) + pipe + '\n' \
+        + pipe + "  total RLC PDUs         = {0:<8}  ".format(Common.rlcPdus)       \
+        + pipe + "  total NOK RLC Header   = {0:<8}  ".format(Common.nokRlcHeader)  + pipe + '\n' \
+        + pipe + "  total DRB SDUs         = {0:<8}  ".format(Common.drbSdus)       \
+        + pipe + "  total discarded PDU    = {0:<8}  ".format(Common.discardedPdu)  + pipe + '\n' \
+        + Color.bold + '+-------------------------------------+-------------------------------------+\n' + Color.nocolor
+        print stats
 
 class PdcpPacket(Parser):
     def __init__(self):

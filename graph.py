@@ -133,8 +133,8 @@ class Graph:
         plt.subplot(3,2,5); self.draw('DL_MAC')
         plt.subplot(3,2,6); self.draw('UL_MAC')
         
-        if settings.png:       fig.savefig('throughput.png', dpi=100)
-        if settings.showgraph: plt.show()
+        if settings.png  : fig.savefig('throughput.png', dpi=100)
+        if settings.plot : plt.show()
 
 
     def printAxes(self):

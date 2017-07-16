@@ -147,13 +147,13 @@ def usage():
     print "                      This could be also a file extension. For instance '.log' or '.txt'"
     print "   -p|--path          instead of following working copy folder with -w option, this parameter set all path e.g /path/to/result/folder"
     print "   -g                 enable graphical mode which open figures"
-    print "   -c                 show graphs on console. Mandatory use of -g option."
-    print "   --show             show figure exactly in the same way as -g option"
+    print "   -c                 show graphs on console. Need -g option."
+    print "   --show             show figure in a new window. Need -g option"
     print "   -a|--application   choose tool to use. syslogAnalyzer by default which analysis udplogs"
     print "   -b|--board         select which product to use. (fsmr3, Airscale...)"
     print "   --clear            by default file analysis is stored in CSV file. If script is run again, this will regenarated analysis and CSV files"
-    print "   --png              enable creation of PNG image of figures. Need -g option or --show"
-    print "   --dpi              set DPI (dots per inch) for image. Need -g option or --show"
+    print "   --png              enable creation of PNG image of figures. Need -g option"
+    print "   --dpi              set DPI (dots per inch) for image. Need -g option"
     print "\nExample:\n python parser.py -v -p /home/user/project/result -g --clear --png --dpi 50 "
     print " will analyse syslogs from /home/user/project/result folder and created a figure and saved it in a png image of dpi 50"
 
@@ -181,8 +181,7 @@ def getArguments(argv):
             settings.graphAllowed = True
             settings.dpi          = int(arg)
         elif opt == '--show':
-            settings.graphAllowed = True
-            settings.showgraph    = True
+            settings.plot         = True
         elif opt == '--clear':
             settings.clear        = True
         elif opt in ('-p', "--path"):
@@ -382,16 +381,16 @@ def main(argv):
         print "\nResult folder already read and CSV for throughput and CPU load created."
         print "You can check files in csv folder where python script source file is present."
 
-    if settings.graphAllowed:
+    if settings.graphAllowed or settings.plot:
         import graph
-        print "\ndrawing graph mode has been set. Plotting graph..."
+        print "\ndrawing graph mode has been set (-g or --show option). Plotting graph..."
         g = graph.Graph()
-        if console:
+        if settings.console:
             g.drawConsole('PDCP')
         else:
             g.drawFigure()
 
-    print ""
+    print "\n{} ended".format(settings.programName)
 
 def getAllUeGroup(data):
     ueGroups = []
