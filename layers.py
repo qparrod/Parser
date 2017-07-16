@@ -59,12 +59,12 @@ class PdcpPacket(Parser):
         Parser.__init__(self)
         self.dlpdcpthroughput = {}
         self.ulpdcpthroughput = {}
+        self.dldiscard = {}
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SR: (\d+) OOD: (\d+) OOM X2: (\d+) drb: (\d+) srb: (\d+) gtpu: (\d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: SRB toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK#1: (\d+ \d+ \d+) NACK#2: (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) SA SwQ/Tx/Rx: \d+/\d+/\d+ \d+/\d+/\d+ \d+/\d+/\d+ \[\d+\] WinStall: (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+) SR: (\d+) RoHCF: (\d+) toSGW: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
-        #self.count = 2
 
     def setDl(self):
         import settings
@@ -75,6 +75,11 @@ class PdcpPacket(Parser):
         else:
             self.regex = re.compile(r'FSP-\d+ <(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)') 
             self.count = 8
+
+    def setDiscardSdu(self):
+        self.data  = self.dldiscard
+        self.regex = re.compile(r'VM-.+ (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
+        self.count = 4
 
     def setUl(self):
         self.data  = self.ulpdcpthroughput
@@ -102,11 +107,18 @@ class PdcpPacket(Parser):
         self.setUl()
         self.get(2) #DataPDU
 
+        self.setDiscardSdu()
+        self.get(2)
+
+
     def getDlPdcpThroughput(self):
         return self.dlpdcpthroughput
 
     def getUlPdcpThroughput(self):
         return self.ulpdcpthroughput
+
+    def getDlDiscard(self):
+        return self.dldiscard
 
 
 

@@ -351,10 +351,9 @@ def main(argv):
             if settings.verbose : print "delete warning.txt"
             os.remove('warning.txt')
 
-        throughputDirectory='throughput'
-        cpuloadDirectory='cpuload'
-        os.makedirs(directory+'/'+throughputDirectory)
-        os.makedirs(directory+'/'+cpuloadDirectory)
+        os.makedirs(directory+'/throughput')
+        os.makedirs(directory+'/cpuload')
+        os.makedirs(directory+'/discard')
 
         # check board type and deployment from startup log
         getGlobalInformation()
@@ -404,6 +403,8 @@ def main(argv):
         createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
         createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
 
+        createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
+
         createCsvLoad(cpuload.getCpuLoad())
     else:
         print "\nResult folder already read and CSV for throughput and CPU load created."
@@ -449,12 +450,15 @@ def createCsv(name,type,data):
     for core in data:
         directory = ''
         header= []
-        if (type=="throughput"):
+        if type=="throughput" :
             directory = 'throughput'
             header = ['timestamp','{} {} in kbps for core {}'.format(name,type,core)]
-        elif (type=="load"):
+        elif type=="load" :
             directory = 'cpuload'
             header = ['timestamp','{} {} in % for core {}'.format(name,type,core)]
+        elif type == 'discard' :
+            directory = 'discard'
+            header = ['timestamp','{} {} for core {}'.format(name,type,core)]
         else:
             print "csv file type not recognized"
             exit()

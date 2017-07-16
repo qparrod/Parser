@@ -56,20 +56,30 @@ class Graph:
 
                 self.data[self.core][self.ueGroup].append(row)
 
-    def getData(self,layer):
+    def getThroughputData(self,layer):
         self.layer = layer
-        self.cores = self.getCoreName()
+        self.cores = self.getCoreName('throughput')
         self.data  = {}
         for core in self.cores:
-            self.core = core
+            self.core    = core
             self.ueGroup = 0 if 'MAC' not in self.layer else core[-1]
-            csvFilePath = 'csv/throughput/{}_throughput_{}.csv'.format(self.layer,core)
+            csvFilePath  = 'csv/throughput/{}_throughput_{}.csv'.format(self.layer,core)
             self.getDataFromFile(csvFilePath)
 
-    def getCoreName(self):
+    def getDiscardData(self,layer):
+        self.layer = layer
+        self.cores = self.getCoreName('discard')
+        self.data  = {}
+        for core in self.cores:
+            self.core    = core
+            self.ueGroup = 0
+            csvFilePath  = 'csv/discard/{}_discard_{}.csv'.format(self.layer,core)
+            self.getDataFromFile(csvFilePath)
+
+    def getCoreName(self,folder):
         from os import listdir
         from os.path import isfile, join
-        path = 'csv/throughput'
+        path = 'csv/{}'.format(folder)
         files = [f for f in listdir(path) if (isfile(join(path, f)) and self.layer in f)]
 
         import re
@@ -80,9 +90,12 @@ class Graph:
                 cores.append(m.group(1))
         return cores
 
-    def draw(self,layer):
-        if settings.verbose : print "   graph: draw {}".format(layer)
-        self.getData(layer)
+    def draw(self):
+        print "   graph: draw discard"
+
+    def drawThroughput(self,layer):
+        if settings.verbose : print "   graph: draw throughput {}".format(layer)
+        self.getThroughputData(layer)
 
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
@@ -126,12 +139,15 @@ class Graph:
         print "   Creating figure. This can take few seconds..."
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
         print "   figure created"
-        plt.subplot(3,2,1); self.draw('DL_PDCP')
-        plt.subplot(3,2,2); self.draw('UL_PDCP')
-        plt.subplot(3,2,3); self.draw('DL_RLC')
-        plt.subplot(3,2,4); self.draw('UL_RLC')
-        plt.subplot(3,2,5); self.draw('DL_MAC')
-        plt.subplot(3,2,6); self.draw('UL_MAC')
+        plt.subplot(3,2,1); self.drawThroughput('DL_PDCP')
+        plt.subplot(3,2,2); self.drawThroughput('UL_PDCP')
+        plt.subplot(3,2,3); self.drawThroughput('DL_RLC')
+        plt.subplot(3,2,4); self.drawThroughput('UL_RLC')
+        plt.subplot(3,2,5); self.drawThroughput('DL_MAC')
+        plt.subplot(3,2,6); self.drawThroughput('UL_MAC')
+
+        fig2 = plt.figure(2)
+        self.draw('DL_PDCP')
         
         if settings.png  : fig.savefig('throughput.png', dpi=100)
         if settings.plot : plt.show()
