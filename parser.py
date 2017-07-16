@@ -37,9 +37,9 @@ class Check:
 
     def printResult(self):
         if self.count == 0:
-            print Color.ok + "No {}".format(self.type) + Color.nocolor
+            print Color.ok + "   No {}".format(self.type) + Color.nocolor
         else:
-            print "Number of {0:<7} : {1:}".format(self.type,self.count)
+            print "   Number of {0:<7} : {1:}".format(self.type,self.count)
         
 
 class Warning(Check):
@@ -72,15 +72,43 @@ class Custom(Check):
 
 
 class Parser:
+
+    timeDelta = 2.0
+
+
     def __init__(self):
         self.regex    = ''
         self.files    = settings.files
         self.regex    = None
         self.count    = 0
-
+        self.line     = ''
     def search(self, _string):
         m = self.regex.search(_string)
-        return (m.group(i+1) for i in range(self.count)) if m else ()
+        return [ m.group(i+1) for i in range(self.count) ] if m else ()
+
+    def fromByteToBit(self,val):
+        return val * 8
+
+    def convertToKbps(self,val):
+        return val / 1024
+
+    def get(self, pos):
+        import ptime
+
+        values = self.search(self.line)
+        if values != () :
+            core      = values[0]
+            timestamp = values[1]
+            data      = values[pos]
+            values = [ int(s) for s in data.split() if s.isdigit() ]
+            if core not in self.data:
+                self.data[core] = []
+            t = ptime.Time(timestamp)
+            timeDelta = 2.0
+            for i in reversed(range(len(values))):
+                timeInDatetime   = t - i * Parser.timeDelta
+                throughputInkbps = self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta)
+                self.data[core].append( (timeInDatetime, throughputInkbps))
 
     
 
@@ -98,8 +126,8 @@ class CpuLoad(Parser):
     def getCpuLoad(self):
         return self.cpuload
 
-    def getCpuLoadStats(self,cpuload,line):
-        cpuload.read()
+    def getCpuLoadStats(self,line):
+        self.read()
         values = self.search(line)
         if(values!=()):
             (core,timestamp,load,max)=values
@@ -338,12 +366,12 @@ def main(argv):
         cpuload    = CpuLoad()
         commonStats = Common()
 
+        print Color.bold + "\nread all files containing pattern '{}'".format(settings.syslogType) + Color.nocolor
         from datetime import datetime
         totalTime = datetime.now()
         for filename in settings.files:
-            #if ( re.search(r'.*udplog_.*'.format(settings.syslogType),filename) ):
             if settings.syslogType in filename:
-                print "\nread filename : " + filename
+                print "\n   read filename : " + filename
                 Bar = ProgressBar(file_len(filename),60, ' ')
                 d = datetime.now()
                 with open(filename) as f:
@@ -353,10 +381,10 @@ def main(argv):
                         if (lineNumber%2000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
-                        cpuload.getCpuLoadStats(cpuload,line)
-                        pdcppacket.getPdcpThroughputFromLine(pdcppacket,line)
-                        rlcpacket.getRlcThroughput(rlcpacket,line)
-                        macpacket.getMacThroughput(macpacket,line)
+                        cpuload.getCpuLoadStats(line)
+                        pdcppacket.getPdcpThroughputFromLine(line)
+                        rlcpacket.getRlcThroughputFromLine(line)
+                        macpacket.getMacThroughputFromLine(line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -369,11 +397,11 @@ def main(argv):
 
         commonStats.printStatistics()
 
-        createCsvThroughput('DL_PDCP',pdcppacket.getPDCPThroughput())
+        createCsvThroughput('DL_PDCP',pdcppacket.getDlPdcpThroughput())
         createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
-        createCsvThroughput('DL_RLC',rlcpacket.getRLCThroughput())
+        createCsvThroughput('DL_RLC',rlcpacket.getDlRlcThroughput())
         createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
-        createCsvThroughput('DL_MAC',macpacket.getMACThroughput())
+        createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
         createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
 
         createCsvLoad(cpuload.getCpuLoad())
@@ -432,6 +460,8 @@ def createCsv(name,type,data):
             exit()
 
         if 'MAC' in name or 'UL_RLC' in name:
+            # special case where uegroup in present in data...
+            # this information is no everywhere in traces...
             ueGroupToFilter = filtering(data[core])
             ueGroups=[]
 
