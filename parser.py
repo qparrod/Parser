@@ -137,9 +137,10 @@ class CpuLoad(Parser):
             self.cpuload[core].append((t-0,float(load)))
 
 def getGlobalInformation():
-    settings.cloud = False
+    found = False
     for filename in settings.files:
         if ( re.search(r'.*udplog_Node_startup_.*',filename) ):
+            found = True
             with open(filename,'r') as f:
                 for line in f:
                     if(re.search(r'VM-\d+.+',line)): settings.cloud=True
@@ -148,6 +149,8 @@ def getGlobalInformation():
                     m = re.search(r'Cpu\d Idling! (\dDSP) ',line)
                     if (m): settings.deployment = m.group(1)
             break
+    if not found:
+         print Color.warning + "File containing deployment and board not found (udplog_Node_startup...)" + Color.nocolor
 
 def printGlobalInformation():
     print '\033[1m'+'+'+'-'*60+'+'
@@ -179,6 +182,7 @@ def usage():
     print "   --show             show figure in a new window. Need -g option"
     print "   -a|--application   choose tool to use. syslogAnalyzer by default which analysis udplogs"
     print "   -b|--board         select which product to use. (fsmr3, Airscale...)"
+    print "   --cloud            specify that logs are in cloud environment. Useful whenNode_startup file is not present"
     print "   --clear            by default file analysis is stored in CSV file. If script is run again, this will regenarated analysis and CSV files"
     print "   --png              enable creation of PNG image of figures. Need -g option"
     print "   --dpi              set DPI (dots per inch) for image. Need -g option"
@@ -189,7 +193,7 @@ def getArguments(argv):
     import sys
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:vt:",["application=","board=","wcpy=","png","dpi=","show","clear","type","path"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:vt:",["application=","board=","wcpy=","png","dpi=","show","clear","type","path","cloud"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -203,7 +207,7 @@ def getArguments(argv):
         elif opt == '-g':
             settings.graphAllowed = True
         elif opt in ('-w','--wcpy'):
-            workPathNeeded        = True
+            settings.workPathNeeded        = True
             settings.branch       = arg
         elif opt == '--dpi':
             settings.graphAllowed = True
@@ -212,6 +216,8 @@ def getArguments(argv):
             settings.plot         = True
         elif opt == '--clear':
             settings.clear        = True
+        elif opt == '--cloud':
+            settings.cloud        = True
         elif opt in ('-p', "--path"):
             settings.path         = arg
         elif opt in ('-t', "--type"):
@@ -388,6 +394,7 @@ def main(argv):
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
                     Bar.update(lineNumber,datetime.now() - d)
+                print ""
                 Warning(filename)
                 Error  (filename)
                 Custom (filename)
