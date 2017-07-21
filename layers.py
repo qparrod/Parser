@@ -102,7 +102,14 @@ class PdcpPacket(Parser):
         self.line = line 
 
         self.setDl()
-        self.get(4) #inbytes
+        r = self.get(4)
+        if r != None:
+            print self.line
+            (core, timestamp, value) = r
+            if core not in self.data:
+                self.dlpdcpthroughput[core] = []
+            print (timestamp,value)
+            self.dlpdcpthroughput[core].append( (timestamp,value) )  #inbytes
 
         self.setUl()
         self.get(2) #DataPDU

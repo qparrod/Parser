@@ -3,10 +3,8 @@
 import re
 from layers import *
 #from pool import PoolStats
-from csvWriter import Csv
 import settings
 from settings import Color,ProgressBar
-import csv
 #import ptime
 
 
@@ -40,8 +38,7 @@ class Check:
             print Color.ok + "   No {}".format(self.type) + Color.nocolor
         else:
             print "   Number of {0:<7} : {1:}".format(self.type,self.count)
-        
-
+    
 class Warning(Check):
     def __init__(self,path):
         Check.__init__(self)
@@ -75,7 +72,6 @@ class Parser:
 
     timeDelta = 2.0
 
-
     def __init__(self):
         self.regex    = ''
         self.files    = settings.files
@@ -94,9 +90,10 @@ class Parser:
 
     def get(self, pos):
         import ptime
-
         values = self.search(self.line)
         if values != () :
+            if pos == 4:
+                print self.line
             core      = values[0]
             timestamp = values[1]
             data      = values[pos]
@@ -108,7 +105,10 @@ class Parser:
             for i in reversed(range(len(values))):
                 timeInDatetime   = t - i * Parser.timeDelta
                 throughputInkbps = self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta)
-                self.data[core].append( (timeInDatetime, throughputInkbps))
+                return (timeInDatetime, throughputInkbps)
+                #self.data[core].append( (timeInDatetime, throughputInkbps) )
+        else :
+            return None
 
     
 
@@ -396,16 +396,18 @@ def main(argv):
 
         commonStats.printStatistics()
 
-        createCsvThroughput('DL_PDCP',pdcppacket.getDlPdcpThroughput())
-        createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
-        createCsvThroughput('DL_RLC',rlcpacket.getDlRlcThroughput())
-        createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
-        createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
-        createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
+        from csvWriter import *
+        csvwriter = Csv()
+        csvwriter.createCsvThroughput('DL_PDCP',pdcppacket.getDlPdcpThroughput())
+        csvwriter.createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
+        csvwriter.createCsvThroughput('DL_RLC',rlcpacket.getDlRlcThroughput())
+        csvwriter.createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
+        csvwriter.createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
+        csvwriter.createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
 
-        createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
+        csvwriter.createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
 
-        createCsvLoad(cpuload.getCpuLoad())
+        csvwriter.createCsvLoad(cpuload.getCpuLoad())
     else:
         print "\nResult folder already read and CSV for throughput and CPU load created."
         print "You can check files in csv folder where python script source file is present."
@@ -441,7 +443,7 @@ def filtering(data):
         if all(v<0.1 for v in values):
             ueGroupToFilter.append(uegroup)
     return ueGroupToFilter
-
+'''
 
 def createCsv(name,type,data):
     if data == {}:
@@ -501,6 +503,7 @@ def createCsvThroughput(layerName,data):
 
 def createCsvLoad(data):
     createCsv('CPU','load',data)
+    '''
 
 
 if __name__ == "__main__":
