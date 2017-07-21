@@ -146,8 +146,8 @@ class Graph:
         plt.subplot(3,2,5); self.drawThroughput('DL_MAC')
         plt.subplot(3,2,6); self.drawThroughput('UL_MAC')
 
-        fig2 = plt.figure(2)
-        self.draw('DL_PDCP')
+        #fig2 = plt.figure(2)
+        #self.draw('DL_PDCP')
         
         if settings.png  : fig.savefig('throughput.png', dpi=100)
         if settings.plot : plt.show()

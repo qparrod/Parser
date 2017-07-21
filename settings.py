@@ -65,10 +65,8 @@ class ProgressBar:
         if (perc!=100): color = Color.nocolor
         else:           color = Color.ok
 
-        out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),
-            time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
+        out = '\r{0} {1} {2:>3}%\033[0m [{3}{4}] time: {5:}:{6:02d}:{7:02d}.{8:03d}'.format(self.title,color,perc,'='*bar,' ' * (self.maxbar - bar),time.seconds//3600,(time.seconds//60)%60,time.seconds,time.microseconds/1000) 
 
         sys.stdout.write(out)
 
-        if perc == 100 : sys.stdout.write('\n')
         sys.stdout.flush()
