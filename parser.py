@@ -17,11 +17,13 @@ def file_len(fname):
 
 
 class Check:
-    def __init__(self):
+    def __init__(self,path):
         self.count     = 0
         self.extension = '.txt'
-        self.type      = ''
-        self.pattern   = ''
+        #self.type      = ''
+        #   self.pattern   = ''
+        self.checkFile(path)
+        self.printResult()
 
     def checkFile(self, path):
         fd = open(self.type + self.extension,'a')
@@ -41,27 +43,22 @@ class Check:
     
 class Warning(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = 'warning'
         self.patterns = ['WRN','Warning','WARNING']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
+        
 
 class Error(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = 'error'
         self.patterns = ['ERR','error','ERROR']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
 
 class Custom(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = "custom"
         self.patterns = ['long event detected']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
 
 
 
@@ -76,16 +73,16 @@ class Parser:
         self.regex    = ''
         self.files    = settings.files
         self.regex    = None
-        self.count    = 0
         self.line     = ''
+        self.core      = None
+        self.timestamp = None
+        self.data      = None
+        self.ueGroup   = None
 
-    def search(self):
-        m = self.regex.search(self.line)
-        return [ m.group(i+1) for i in range(self.count) ] if m else ()
 
-    def search2(self):
-        m = self.regex.search(self.line)
-        return [ m.group(i+1) for i in range(self.count) ] if m else ('','',None)
+    #def search(self,count):
+    #    m = self.regex.search(self.line)
+    #    return [ m.group(i+1) for i in range(count) ] if m else ('','',None)
 
 
     def fromByteToBit(self,val):
@@ -94,47 +91,81 @@ class Parser:
     def convertToKbps(self,val):
         return val / 1024
 
-    def get(self, pos):
-        import ptime
-        values = self.search()
-        if values != () :
-            if pos == 4:
-                print self.line
-            core      = values[0]
-            timestamp = values[1]
-            data      = values[pos]
-            values = [ int(s) for s in data.split() if s.isdigit() ]
-            if core not in self.data:
-                self.data[core] = []
-            t = ptime.Time(timestamp)
-            timeDelta = 2.0
-            for i in reversed(range(len(values))):
-                timeInDatetime   = t - i * Parser.timeDelta
-                throughputInkbps = self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta)
-                return (timeInDatetime, throughputInkbps)
-                #self.data[core].append( (timeInDatetime, throughputInkbps) )
-        else :
-            return None
 
     def calculateThroughput(self):
         self.value = [ int(v) * 8 / 1024  / 2.0  for v in self.value ] # in kbps
 
+    def fill(self, obj):
+        if self.value:
+            if self.core not in obj:
+                obj[self.core] = []
+            for i in range(len(self.timestamp)):
+                if self.ueGroup:
+                    obj[self.core].append( (self.timestamp[i], self.ueGroup, self.value[i]) )
+                else:
+                    obj[self.core].append( (self.timestamp[i], self.value[i]) )
 
-    def get2(self,regex):
-        import ptime
-        self.regex = re.compile(r'(LINUX-Disp_\d) <(.*)>.*'+regex)
-        self.count = 3 # core, timestamp and value
-        core, timestamp, data = self.search2()
-        values = [ int(s) for s in data.split() if s.isdigit() ] if data else []
-        t = ptime.Time(timestamp)
-        timeDelta = 2.0
+    def getValue(self,string):
+        regex = re.compile(string)
+        m = re.search(regex,self.line)
+        return m.group(1) if m else None
 
-        timeInDatetime = []
-        throughputInkbps = []
-        for i in reversed(range(len(values))):
-            timeInDatetime.append( t - i * Parser.timeDelta )
-            #throughputInkbps.append( self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta) )
-        return core, timeInDatetime, values
+    def get(self,regex):
+        self.core      = self.getValue(r'^.*(LINUX-Disp_\d|FSP-\d+) ')
+        self.timestamp = self.getValue(r'^.*<(.*Z)> ')
+        self.data      = self.getValue(regex)
+        self.ueGroup   = self.getValue(r'^.*x(\d)l')
+
+        if not self.core or not self.timestamp or not self.data :
+            return
+        #print self.timestamp
+        #print self.ueGroup
+        #print self.core
+        self.value     = [ int(s) for s in self.data.split() if s.isdigit() ] if self.data else []
+        if self.timestamp :
+            import ptime
+            t = ptime.Time(self.timestamp)
+
+            self.timestamp = []
+            for i in reversed(range(len(self.value))): # len != 0 when there are 3 data for every 2 seconds
+                self.timestamp.append( t - i * Parser.timeDelta )
+
+    def getDlSduThroughput(self):
+        self.get(self.dl.sdu.field)
+        if not self.core or not self.timestamp or not self.data :
+            return
+        self.calculateThroughput()
+        self.fill( self.dl.sdu.throughput )
+
+    def getDlPduThroughput(self):
+        self.get(self.dl.pdu.field)
+        if not self.core or not self.timestamp or not self.data :
+            return
+        self.calculateThroughput()
+        self.fill( self.dl.pdu.throughput )
+
+    def getUlSduThroughput(self):
+        self.get(self.ul.sdu.field)
+        self.calculateThroughput()
+        self.fill( self.ul.sdu.throughput )
+
+    def getUlPduThroughput(self):
+        self.get(self.ul.pdu.field)
+        self.calculateThroughput()
+        self.fill( self.ul.pdu.throughput )
+
+    def getDlStats(self):
+        self.getDlSduThroughput()
+        self.getDlPduThroughput()
+
+    def getUlStats(self):
+        self.getUlSduThroughput()
+        self.getUlPduThroughput()
+
+    def getStats(self,line):
+        self.line = line
+        self.getDlStats()
+        #self.getUlStats()
 
 
 
@@ -408,13 +439,13 @@ def main(argv):
                     lineNumber=0
                     for line in f:
                         lineNumber=lineNumber+1
-                        if (lineNumber%2000==0):
+                        if (lineNumber%1000==0):
                             Bar.update(lineNumber,datetime.now() - d)
 
-                        cpuload.getCpuLoadStats(line)
+                        #cpuload.getCpuLoadStats(line)
                         pdcp.getStats(line)
                         rlc.getStats(line)
-                        mac.getStats(line)
+                        #mac.getStats(line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -432,15 +463,10 @@ def main(argv):
         csvwriter = Csv()
         csvwriter.createCsvThroughput('downlink PDCP SDU',pdcp.dl.sdu.throughput)
         csvwriter.createCsvThroughput('downlink PDCP PDU',pdcp.dl.pdu.throughput)
-        #csvwriter.createCsvThroughput('UL_PDCP',pdcp.getUlPdcpThroughput())
-        #csvwriter.createCsvThroughput('DL_RLC',rlc.getDlRlcThroughput())
-        csvwriter.createCsvThroughput('DL_RLC_SDU',rlc.sduThroughput)
-        csvwriter.createCsvThroughput('DL_RLC_PDU',rlc.pduThroughput)
-        #csvwriter.createCsvThroughput('UL_RLC',rlc.getUlRlcThroughput())
-        #csvwriter.createCsvThroughput('DL_MAC',mac.getDlMacThroughput())
-        #csvwriter.createCsvThroughput('DL_MAC_SDU',mac.sduThroughput)
-        #csvwriter.createCsvThroughput('DL_MAC_PDU',mac.pduThroughput)
-        #csvwriter.createCsvThroughput('UL_MAC',mac.getUlMacThroughput())
+        csvwriter.createCsvThroughput('downlink RLC SDU',rlc.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink RLC PDU',rlc.dl.pdu.throughput)
+        csvwriter.createCsvThroughput('downlink MAC SDU',mac.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink MAC PDU',mac.dl.pdu.throughput)
 
         #csvwriter.createCsv('DL_PDCP','discard',pdcp.getDlDiscard())
 
@@ -460,85 +486,6 @@ def main(argv):
 
     print "\n{} ended".format(settings.programName)
 
-def getAllUeGroup(data):
-    ueGroups = []
-    for (timestamp,uegroup,value) in data:
-        if uegroup not in ueGroups: ueGroups.append(uegroup)
-    return ueGroups
-
-def getValuesFromUeGroup(data,ref):
-    values = []
-    for (timestamp,uegroup,value) in data:
-        if uegroup==ref: values.append(value)
-    return values
-
-def filtering(data):
-    ueGroupToFilter = []
-    ueGroups = getAllUeGroup(data)
-    for uegroup in ueGroups:
-        values = getValuesFromUeGroup(data,uegroup)
-        if all(v<0.1 for v in values):
-            ueGroupToFilter.append(uegroup)
-    return ueGroupToFilter
-
-def createCsv(name,type,data):
-    if data == {}:
-        if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
-        return
-    for core in data:
-        directory = ''
-        header= []
-        if type=="throughput" :
-            directory = 'throughput'
-            header = ['timestamp','{} {} in kbps for core {}'.format(name,type,core)]
-        elif type=="load" :
-            directory = 'cpuload'
-            header = ['timestamp','{} {} in % for core {}'.format(name,type,core)]
-        elif type == 'discard' :
-            directory = 'discard'
-            header = ['timestamp','{} {} for core {}'.format(name,type,core)]
-        else:
-            print "csv file type not recognized"
-            exit()
-
-        if 'MAC' in name or 'UL_RLC' in name:
-            # special case where uegroup in present in data...
-            # this information is no everywhere in traces...
-            ueGroupToFilter = filtering(data[core])
-            ueGroups=[]
-
-            for (timestamp,ueGroup,throughput) in data[core]:
-                if(ueGroup in ueGroupToFilter):
-                    continue
-                line = (timestamp,throughput)
-                fd = 0 
-                if ueGroup not in ueGroups:
-                    ueGroups.append(ueGroup)
-                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'w')
-                    writer = csv.writer(fd)
-                    writer.writerow(header)
-                else:
-                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'a')
-                    writer = csv.writer(fd)
-                writer.writerow(line)
-                fd.close()
-        else:
-            if (all(e[1]<0.1 for e in data[core]) ):
-                if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
-                continue
-            fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
-            writer = csv.writer(fd)
-            writer.writerow(header)
-            for line in data[core]:
-                writer.writerow(line)
-            fd.close()
-    if settings.verbose : print "CSV file created for {} {}".format(name,type)
-
-def createCsvThroughput(layerName,data):
-    createCsv(layerName,'throughput',data)
-
-def createCsvLoad(data):
-    createCsv('CPU','load',data)
 
 if __name__ == "__main__":
     settings.init()

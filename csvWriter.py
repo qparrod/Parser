@@ -27,6 +27,7 @@ class Csv:
         if data == {}:
             if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
             return
+            
         for core in data:
             directory = ''
             header= []
@@ -42,6 +43,10 @@ class Csv:
             else:
                 print "csv file type not recognized"
                 exit()
+
+            if settings.cloud and 'PDCP' in name and 'FSP-' in core:
+                if settings.verbose : print "filter PDCP FSP core {}".format(core)
+                continue
 
             if 'MAC' in name or 'UL_RLC' in name:
                 # special case where uegroup in present in data...

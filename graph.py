@@ -129,7 +129,7 @@ class Graph:
         plt.legend()
         #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, shadow=True, borderaxespad=0.)
 
-    
+
 
 
     def drawFigure(self):
@@ -141,20 +141,13 @@ class Graph:
         print "   Creating figure. This can take few seconds..."
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
         print "   figure created"
-        '''
-        plt.subplot(3,2,1); self.drawThroughput('DL_PDCP')
-        plt.subplot(3,2,2); self.drawThroughput('UL_PDCP')
-        plt.subplot(3,2,3); self.drawThroughput('DL_RLC')
-        plt.subplot(3,2,4); self.drawThroughput('UL_RLC')
-        plt.subplot(3,2,5); self.drawThroughput('DL_MAC')
-        plt.subplot(3,2,6); self.drawThroughput('UL_MAC')
-        '''
+
         plt.subplot(3,2,1); self.drawThroughput('downlink PDCP SDU')
         plt.subplot(3,2,2); self.drawThroughput('downlink PDCP PDU')
-        plt.subplot(3,2,3); self.drawThroughput('DL_RLC_SDU')
-        plt.subplot(3,2,4); self.drawThroughput('DL_RLC_PDU')
-        plt.subplot(3,2,5); self.drawThroughput('DL_MAC_SDU')
-        plt.subplot(3,2,6); self.drawThroughput('DL_MAC_PDU')
+        plt.subplot(3,2,3); self.drawThroughput('downlink RLC SDU')
+        plt.subplot(3,2,4); self.drawThroughput('downlink RLC PDU')
+        plt.subplot(3,2,5); self.drawThroughput('downlink MAC SDU')
+        plt.subplot(3,2,6); self.drawThroughput('downlink MAC PDU')
 
         #fig2 = plt.figure(2)
         #self.draw('DL_PDCP')

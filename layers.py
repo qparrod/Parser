@@ -59,6 +59,7 @@ class Packet:
         self.throughput     = {}
         self.numberOfPacket = {}
         self.discard        = {}
+        self.field          = ''
 
 class Sdu(Packet):
     def __init__(self):
@@ -84,98 +85,34 @@ class Pdcp(Parser):
         self.dl = Dl()
         self.ul = Ul()
 
+        self.dl.sdu.field = r'DRB.*X2:.*inBytes: (\d+ \d+ \d+) toRLC:'
+        self.dl.pdu.field = r'DRB.*toRLC:.*inBytes: (\d+ \d+ \d+) ACK:'
+        self.ul.sdu.field = r''
+        self.ul.pdu.field = r'UL: DataPDU: (\d+ \d+ \d+)' # probably packets and not bytes
+
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SR: (\d+) OOD: (\d+) OOM X2: (\d+) drb: (\d+) srb: (\d+) gtpu: (\d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: SRB toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK#1: (\d+ \d+ \d+) NACK#2: (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) SA SwQ/Tx/Rx: \d+/\d+/\d+ \d+/\d+/\d+ \d+/\d+/\d+ \[\d+\] WinStall: (\d+ \d+ \d+)')
         #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+) SR: (\d+) RoHCF: (\d+) toSGW: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
 
-    def fill(self, obj):
-        if self.value:
-            if self.core not in obj:
-                obj[self.core] = []
-            for i in range(len(self.timestamp)):
-                obj[self.core].append( (self.timestamp[i], self.value[i]) )
-
-    def getDlSduThroughput(self):
-        self.core, self.timestamp, self.value = self.get2(r'DRB.*X2:.*inBytes: (\d+ \d+ \d+) toRLC:')
-        self.calculateThroughput()
-        self.fill( self.dl.sdu.throughput )
-
-    def getDlPduThroughput(self):
-        self.core, self.timestamp, self.value = self.get2(r'DRB.*toRLC:.*inBytes: (\d+ \d+ \d+) ACK:')
-        self.calculateThroughput()
-        self.fill( self.dl.pdu.throughput )
-
-    def getUlSduThroughput(self):
-        self.core, self.timestamp, self.value = self.get2(r'TODO')
-        self.calculateThroughput()
-        self.fill( self.ul.sdu.throughput )
-
-    def getUlPduThroughput(self):
-        self.core, self.timestamp, self.value = self.get2(r'TODO')
-        self.calculateThroughput()
-        self.fill( self.ul.pdu.throughput )
-
-    def getDlStats(self):
-        self.getDlSduThroughput()
-        self.getDlPduThroughput()
-
-    def getUlStats(self):
-        self.getUlSduThroughput()
-        self.getUlPduThroughput()
-
-    def getStats(self,line):
-        self.line = line
-        self.getDlStats()
-        self.getUlStats()
-
-
 
 
 class Rlc(Parser):
     def __init__(self):
-        self.dlrlcthroughput  = {}
-        self.ulrlcthroughput = {}
+        Parser.__init__(self)
+        self.dl = Dl()
+        self.ul = Ul()
 
-        self.sduThroughput = {}
-        self.pduThroughput = {}
-
-    def setDl(self):
-        self.data  = self.dlrlcthroughput
-        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
-        self.count = 6
-
-    def readUlRcvdRcvp(self):
-        self.count = 0
-
-    def fill(self, obj):
-        if self.value:
-            if self.core not in obj:
-                obj[self.core] = []
-            for i in range(len(self.timestamp)):
-                obj[self.core].append( (self.timestamp[i], self.value[i]) )
-
-    def getSduThroughput(self):
-        #self.core, self.timestamp, self.value = self.get2(r'DLUE STATS 1.*1: (\d+ \d+ \d+)')
-        self.core, self.timestamp, self.value = self.get2(r'RLC/STATS/DL: RCVD: (\d+ \d+ \d+)')
-        self.calculateThroughput()
-        self.fill( self.sduThroughput )
-
-    def getPduThroughput(self):
-        self.core, self.timestamp, self.value = self.get2(r'DLUE STATS 1.*8: (\d+ \d+ \d+)')
-        self.calculateThroughput()
-        self.fill( self.pduThroughput )
-
-    def getStats(self,line):
-        self.line = line
-        self.getSduThroughput()
-        #self.getPduThroughput()
+        self.dl.sdu.field = r'RLC/STATS/DL: RCVD: (\d+ \d+ \d+)'
+        self.dl.pdu.field = r'DLUE STATS 1.*8: (\d+ \d+ \d+)'
+        self.ul.sdu.field = r'ULUE STATS 2.*1: (\d+ \d+ \d+)'
+        self.ul.pdu.field = r'ULUE STATS 1.*8: (\d+ \d+ \d+)'
 
 
+    '''
     def setUl(self):
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 1/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)')
-        self.count = 12
 
     def getRlcThroughputFromLine(self,line):
         self.line = line
@@ -198,27 +135,29 @@ class Rlc(Parser):
             Common.nokMacHeader += int(NOK_MacHdrs)
             Common.rlcPdus      += int(rlcPdus)
             Common.drbSdus      += int(drbSdus)
-
-    def getDlRlcThroughput(self):
-        return self.dlrlcthroughput
-
-    def getUlRlcThroughput(self):
-        return self.ulrlcthroughput
+    '''
 
 
 class Mac(Parser):
     def __init__(self):
-        self.count = 0
-        self.dlmacthroughput   = {}
-        self.ulmacthroughput = {}
+        Parser.__init__(self)
+        self.dl = Dl()
+        self.ul = Ul()
 
+        self.dl.sdu.field = r'RLC/STATS/DL: RCVD: (\d+ \d+ \d+)'
+        self.dl.pdu.field = r'DLUE STATS 1.*x(\d)l.*8: (\d+ \d+ \d+)'
+        self.ul.sdu.field = r'ULUE STATS 1.*x(\d)l.*1: (\d+ \d+ \d+)'
+        self.ul.pdu.field = r''
+
+        self.ueGroup      = 0
+
+
+    '''
     def readReceivedData(self):
         self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*DLUE STATS 1/.*x(\d)lF.*/1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) 10:(\d+)')
-        self.count = 13
 
     def readUlThroughputP2(self):
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 2/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) ') # MAC
-        self.count = 12
     
     def getMacThroughputFromLine(self,line):
         self.readReceivedData()
@@ -247,13 +186,5 @@ class Mac(Parser):
             Common.nokRlcHeader  += int(NOK_RlcHdrs)
             Common.forwardedSdus += int(forwardedSdus)
             Common.lostUmPdus    += int(lostUmPdus)
-
-    def getDlMacThroughput(self):
-        return self.dlmacthroughput
-
-    def getUlMacThroughput(self):
-        return self.ulmacthroughput
-
-    def getStats(self,line):
-        self.line = line
+    '''
         
