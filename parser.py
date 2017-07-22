@@ -5,7 +5,7 @@ from layers import *
 #from pool import PoolStats
 import settings
 from settings import Color,ProgressBar
-#import ptime
+from csvWriter import *
 
 
 def file_len(fname):
@@ -78,9 +78,15 @@ class Parser:
         self.regex    = None
         self.count    = 0
         self.line     = ''
-    def search(self, _string):
-        m = self.regex.search(_string)
+
+    def search(self):
+        m = self.regex.search(self.line)
         return [ m.group(i+1) for i in range(self.count) ] if m else ()
+
+    def search2(self):
+        m = self.regex.search(self.line)
+        return [ m.group(i+1) for i in range(self.count) ] if m else ('','',None)
+
 
     def fromByteToBit(self,val):
         return val * 8
@@ -90,7 +96,7 @@ class Parser:
 
     def get(self, pos):
         import ptime
-        values = self.search(self.line)
+        values = self.search()
         if values != () :
             if pos == 4:
                 print self.line
@@ -110,7 +116,25 @@ class Parser:
         else :
             return None
 
-    
+    def calculateThroughput(self):
+        self.value = [ int(v) * 8 / 1024  / 2.0  for v in self.value ] # in kbps
+
+
+    def get2(self,regex):
+        import ptime
+        self.regex = re.compile(r'(LINUX-Disp_\d) <(.*)>.*'+regex)
+        self.count = 3 # core, timestamp and value
+        core, timestamp, data = self.search2()
+        values = [ int(s) for s in data.split() if s.isdigit() ] if data else []
+        t = ptime.Time(timestamp)
+        timeDelta = 2.0
+
+        timeInDatetime = []
+        throughputInkbps = []
+        for i in reversed(range(len(values))):
+            timeInDatetime.append( t - i * Parser.timeDelta )
+            #throughputInkbps.append( self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta) )
+        return core, timeInDatetime, values
 
 
 
@@ -128,7 +152,8 @@ class CpuLoad(Parser):
 
     def getCpuLoadStats(self,line):
         self.read()
-        values = self.search(line)
+        self.line = line
+        values = self.search()
         if(values!=()):
             (core,timestamp,load,max)=values
             if core not in self.cpuload:
@@ -365,9 +390,9 @@ def main(argv):
         getGlobalInformation()
         printGlobalInformation()
 
-        pdcppacket = PdcpPacket()
-        rlcpacket  = RlcPacket()
-        macpacket  = MacPacket()
+        pdcp = Pdcp()
+        rlc  = Rlc()
+        mac  = Mac()
         cpuload    = CpuLoad()
         commonStats = Common()
 
@@ -387,9 +412,9 @@ def main(argv):
                             Bar.update(lineNumber,datetime.now() - d)
 
                         cpuload.getCpuLoadStats(line)
-                        pdcppacket.getPdcpThroughputFromLine(line)
-                        rlcpacket.getRlcThroughputFromLine(line)
-                        macpacket.getMacThroughputFromLine(line)
+                        pdcp.getStats(line)
+                        rlc.getStats(line)
+                        mac.getStats(line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 
@@ -401,20 +426,25 @@ def main(argv):
         totalTime = datetime.now() - totalTime
         print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
 
+
         commonStats.printStatistics()
 
-        from csvWriter import *
         csvwriter = Csv()
-        csvwriter.createCsvThroughput('DL_PDCP',pdcppacket.getDlPdcpThroughput())
-        csvwriter.createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
-        csvwriter.createCsvThroughput('DL_RLC',rlcpacket.getDlRlcThroughput())
-        csvwriter.createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
-        csvwriter.createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
-        csvwriter.createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
+        csvwriter.createCsvThroughput('downlink PDCP SDU',pdcp.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink PDCP PDU',pdcp.dl.pdu.throughput)
+        #csvwriter.createCsvThroughput('UL_PDCP',pdcp.getUlPdcpThroughput())
+        #csvwriter.createCsvThroughput('DL_RLC',rlc.getDlRlcThroughput())
+        csvwriter.createCsvThroughput('DL_RLC_SDU',rlc.sduThroughput)
+        csvwriter.createCsvThroughput('DL_RLC_PDU',rlc.pduThroughput)
+        #csvwriter.createCsvThroughput('UL_RLC',rlc.getUlRlcThroughput())
+        #csvwriter.createCsvThroughput('DL_MAC',mac.getDlMacThroughput())
+        #csvwriter.createCsvThroughput('DL_MAC_SDU',mac.sduThroughput)
+        #csvwriter.createCsvThroughput('DL_MAC_PDU',mac.pduThroughput)
+        #csvwriter.createCsvThroughput('UL_MAC',mac.getUlMacThroughput())
 
-        csvwriter.createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
+        #csvwriter.createCsv('DL_PDCP','discard',pdcp.getDlDiscard())
 
-        csvwriter.createCsvLoad(cpuload.getCpuLoad())
+        #csvwriter.createCsvLoad(cpuload.getCpuLoad())
     else:
         print "\nResult folder already read and CSV for throughput and CPU load created."
         print "You can check files in csv folder where python script source file is present."
@@ -450,7 +480,6 @@ def filtering(data):
         if all(v<0.1 for v in values):
             ueGroupToFilter.append(uegroup)
     return ueGroupToFilter
-'''
 
 def createCsv(name,type,data):
     if data == {}:
@@ -510,8 +539,6 @@ def createCsvThroughput(layerName,data):
 
 def createCsvLoad(data):
     createCsv('CPU','load',data)
-    '''
-
 
 if __name__ == "__main__":
     settings.init()
