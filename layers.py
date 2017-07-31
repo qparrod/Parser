@@ -144,12 +144,12 @@ class Mac(Parser):
         self.dl = Dl()
         self.ul = Ul()
 
-        self.dl.sdu.field = r'RLC/STATS/DL: RCVD: (\d+ \d+ \d+)'
+        self.dl.sdu.field = r'DLUE STATS 1.*x(\d)l.*8: (\d+ \d+ \d+)'
         self.dl.pdu.field = r'DLUE STATS 1.*x(\d)l.*8: (\d+ \d+ \d+)'
         self.ul.sdu.field = r'ULUE STATS 1.*x(\d)l.*1: (\d+ \d+ \d+)'
         self.ul.pdu.field = r''
 
-        self.ueGroup      = 0
+        self.hasUeGroup      = True
 
 
     '''

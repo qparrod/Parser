@@ -20,8 +20,6 @@ class Check:
     def __init__(self,path):
         self.count     = 0
         self.extension = '.txt'
-        #self.type      = ''
-        #   self.pattern   = ''
         self.checkFile(path)
         self.printResult()
 
@@ -77,20 +75,14 @@ class Parser:
         self.core      = None
         self.timestamp = None
         self.data      = None
-        self.ueGroup   = None
-
-
-    #def search(self,count):
-    #    m = self.regex.search(self.line)
-    #    return [ m.group(i+1) for i in range(count) ] if m else ('','',None)
-
+        self.hasUeGroup   = False
+        self.ueGroup  = None
 
     def fromByteToBit(self,val):
         return val * 8
 
     def convertToKbps(self,val):
         return val / 1024
-
 
     def calculateThroughput(self):
         self.value = [ int(v) * 8 / 1024  / 2.0  for v in self.value ] # in kbps
@@ -100,7 +92,7 @@ class Parser:
             if self.core not in obj:
                 obj[self.core] = []
             for i in range(len(self.timestamp)):
-                if self.ueGroup:
+                if self.hasUeGroup:
                     obj[self.core].append( (self.timestamp[i], self.ueGroup, self.value[i]) )
                 else:
                     obj[self.core].append( (self.timestamp[i], self.value[i]) )
@@ -111,16 +103,19 @@ class Parser:
         return m.group(1) if m else None
 
     def get(self,regex):
+        self.data      = self.getValue(regex)
+        if not self.data :
+            return 
         self.core      = self.getValue(r'^.*(LINUX-Disp_\d|FSP-\d+) ')
         self.timestamp = self.getValue(r'^.*<(.*Z)> ')
-        self.data      = self.getValue(regex)
-        self.ueGroup   = self.getValue(r'^.*x(\d)l')
+        self.ueGroup   = self.getValue(r'^.*/c.*r.*u.*x(.+)l.*/')
+
+        if self.hasUeGroup and not self.ueGroup :
+            print self.line
+            print self.ueGroup
 
         if not self.core or not self.timestamp or not self.data :
             return
-        #print self.timestamp
-        #print self.ueGroup
-        #print self.core
         self.value     = [ int(s) for s in self.data.split() if s.isdigit() ] if self.data else []
         if self.timestamp :
             import ptime
@@ -191,6 +186,9 @@ class CpuLoad(Parser):
                 self.cpuload[core] = []
             t = ptime.Time(timestamp)
             self.cpuload[core].append((t-0,float(load)))
+
+
+
 
 def getGlobalInformation():
     found = False
@@ -445,7 +443,7 @@ def main(argv):
                         #cpuload.getCpuLoadStats(line)
                         pdcp.getStats(line)
                         rlc.getStats(line)
-                        #mac.getStats(line)
+                        mac.getStats(line)
 
                         #PHY stub
                         # CBitrate:: ... Kilobits pers second on CellId.. 

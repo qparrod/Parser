@@ -21,13 +21,34 @@ class Csv:
                 writer.writerow(dict(zip(fields, elements)))
                 '''
 
+    def getAllUeGroup(self,data):
+        ueGroups = []
+        for (timestamp,uegroup,value) in data:
+            if uegroup not in ueGroups: ueGroups.append(uegroup)
+        return ueGroups
+
+    def getValuesFromUeGroup(self,data,ref):
+        values = []
+        for (timestamp,uegroup,value) in data:
+            if uegroup==ref: values.append(value)
+        return values
+
+    def filtering(self,data):
+        ueGroupToFilter = []
+        ueGroups = self.getAllUeGroup(data)
+        for uegroup in ueGroups:
+            values = self.getValuesFromUeGroup(data,uegroup)
+            if all(v<0.1 for v in values):
+                ueGroupToFilter.append(uegroup)
+        return ueGroupToFilter
+
     def createCsv(self,name,type,data):
         import settings
         from settings import *
         if data == {}:
             if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
             return
-            
+
         for core in data:
             directory = ''
             header= []
@@ -48,10 +69,11 @@ class Csv:
                 if settings.verbose : print "filter PDCP FSP core {}".format(core)
                 continue
 
-            if 'MAC' in name or 'UL_RLC' in name:
+            if 'MAC' in name:
                 # special case where uegroup in present in data...
                 # this information is no everywhere in traces...
-                ueGroupToFilter = filtering(data[core])
+                print data[core]
+                ueGroupToFilter = self.filtering(data[core])
                 ueGroups=[]
 
                 for (timestamp,ueGroup,throughput) in data[core]:

@@ -113,7 +113,9 @@ class Graph:
         sumordinate = [0] * refLength
         dates = []
         for core in self.data:
+            print "layer {} sum core {}".format(layer,core)
             for ueGroup in self.data[core]:
+                print "ueGroup=".format(ueGroup)
                 absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core][ueGroup] ]
                 ordinate = [float(data[1]) for data in self.data[core][ueGroup]] # value to plot
                 sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
