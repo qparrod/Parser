@@ -8,6 +8,7 @@ class Graph:
     def __init__(self):
         self.data = {}
         self.layer = ''
+        #self.ueGroup = ''
 
     def exit(self):
         import curses
@@ -15,7 +16,6 @@ class Graph:
         self.screen.keypad(0)
         curses.echo()
         curses.endwin()
-        #exit()
 
 
     def drawBoxes(self):
@@ -42,7 +42,7 @@ class Graph:
             r = csv.reader(csvfile, delimiter=',') 
             
             if self.core not in self.data:
-                self.data[self.core] = {}
+                self.data[self.core] = []
             for row  in r:
                 if len(row) != 2:
                     print "wrong csv format for {}".format(self.layer)
@@ -50,20 +50,15 @@ class Graph:
                 # retrieve header
                 if row[0] == 'timestamp':
                     continue
-
-                if self.ueGroup not in self.data[self.core]:
-                    self.data[self.core][self.ueGroup] = []
-
-                self.data[self.core][self.ueGroup].append(row)
+                self.data[self.core].append(row)
 
     def getThroughputData(self,layer):
         self.layer = layer
         self.cores = self.getCoreName('throughput')
         self.data  = {}
         for core in self.cores:
-            self.core    = core
-            self.ueGroup = 0 if 'MAC' not in self.layer else core[-1]
-            csvFilePath  = 'csv/throughput/{}_throughput_{}.csv'.format(self.layer,core)
+            self.core    = core # may have ueGroup in it
+            csvFilePath  = 'csv/throughput/{}_throughput_{}.csv'.format(self.layer,self.core)
             self.getDataFromFile(csvFilePath)
 
     def getDiscardData(self,layer):
@@ -72,7 +67,6 @@ class Graph:
         self.data  = {}
         for core in self.cores:
             self.core    = core
-            self.ueGroup = 0
             csvFilePath  = 'csv/discard/{}_discard_{}.csv'.format(self.layer,core)
             self.getDataFromFile(csvFilePath)
 
@@ -93,40 +87,136 @@ class Graph:
     def draw(self):
         print "   graph: draw discard"
 
+    def getDirection(self,layer):
+        direction = None
+        if 'DL' in layer:   direction = 'DL'
+        elif 'UL' in layer: direction = 'UL'
+        else:
+            print "throughput direction not recognized in layer ({})".format(layer)
+            exit()
+        return direction
+
+
     def drawThroughput(self,layer):
-        if settings.verbose : print "   graph: draw throughput {}".format(layer)
+        if settings.verbose : print "\n\n   graph: draw throughput {}".format(layer)
         self.getThroughputData(layer)
 
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
-        refLength = 0
-        refCore   = ''
+
+        dates       = []
+        sumordinate = []
+        refabs      = []
+
+        # SUT
+        sut_cores = settings.SUTCores[settings.deployment][self.getDirection(layer)]
         for core in self.data:
-            for ueGroup in self.data[core]:
-                if (refLength ==0 ):
-                    refLength = len(self.data[core][ueGroup])
-                    refCore   = core
-                if (refLength!=0 and refLength!=len(self.data[core][ueGroup])):
-                    print Color.warning + "   Warning on {}: values of core {} have not same size then {}: {} != {}".format(layer, core, refCore, refLength, len(self.data[core][ueGroup])) + Color.nocolor
-                    break
-        
-        sumordinate = [0] * refLength
-        dates = []
+            if core not in sut_cores: continue
+
+            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core] ]
+            ordinate = [float(data[1]) for data in self.data[core] ]
+
+            t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ] 
+
+            roundtime = [ ptime.Time().round(i,roundTo=1) for i in t ]
+            roundordinate = ordinate[:] # copy all the list
+
+            # filter tuples by aggregating values
+            todel = []
+            for i in range(len(roundtime)):
+                if i+1 < len(roundtime) and roundtime[i]==roundtime[i+1]:
+                    roundordinate[i+1] += roundordinate[i]
+                    todel.append(i)
+            for i in reversed(todel):
+                del roundtime[i]
+                del roundordinate[i]
+
+
+            # create sum of plots
+            if len(sumordinate) == 0:
+                refabs = roundtime[:]
+                sumordinate = [0] * len(refabs)
+
+            todel = []
+            for i in reversed(range(len(refabs))):
+                if refabs[i] not in roundtime:
+                    todel.append(i)
+                else:
+                    sumordinate[i] += ordinate[roundtime.index(refabs[i])]
+
+            for idx in todel:
+                del sumordinate[idx]
+                del refabs[idx]
+
+            dates = dt.date2num(t)
+
+            plt.gca().xaxis.set_major_formatter(dt.DateFormatter('%H:%M:%S'))
+            plt.plot(dates,ordinate,label='{}'.format(core))
+            if 'DL' in self.layer:
+                if 'PDCP' in self.layer:
+                    plt.title('DL PDCP PDU throughput (kbps)')
+                elif 'RLC' in self.layer:
+                    plt.title('DL RLC throughput (kbps)')
+                elif 'MAC' in self.layer:
+                    plt.title('DL MAC throughput (kbps)')
+            elif 'UL' in self.layer:
+                if 'PDCP' in self.layer:
+                    plt.title('UL PDCP PDU throughput (kbps)')
+                elif 'RLC' in self.layer:
+                    plt.title('UL RLC PDU throughput (kbps)')
+                elif 'MAC' in self.layer:
+                    plt.title('UL MAC throughput (kbps)')
+            plt.xticks( rotation=25 )
+
+        # GTP
+        gtp_cores = settings.GTPCores[settings.deployment][self.getDirection(layer)]
         for core in self.data:
-            for ueGroup in self.data[core]:
-                absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core][ueGroup] ]
-                ordinate = [float(data[1]) for data in self.data[core][ueGroup]] # value to plot
-                sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
+            if core not in gtp_cores: continue
+            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core] ]
+            ordinate = [float(data[1]) for data in self.data[core] ]
+            t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
 
-                t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
-                dates = dt.date2num(t)
+            roundtime = [ ptime.Time().round(i,roundTo=1) for i in t ]
+            roundordinate = ordinate[:] # copy all the list
 
-                plt.plot_date(dates,ordinate,'-', label='{} throughput in kbps'.format(core))
-                plt.title('{} throughput'.format(self.layer))
-                plt.xticks( rotation=25 )
+            # filter tuples by aggregating values
+            todel = []
+            for i in range(len(roundtime)):
+                if i+1 < len(roundtime) and roundtime[i]==roundtime[i+1]:
+                    roundordinate[i+1] += roundordinate[i]
+                    todel.append(i)
+            for i in reversed(todel):
+                del roundtime[i]
+                del roundordinate[i]
 
-        plt.plot_date(dates[:refLength], sumordinate, '--',label='total throughput in kbps', linewidth=4)
-        plt.legend()
+
+            # create sum of plots
+            if len(sumordinate) == 0:
+                refabs = roundtime[:]
+                sumordinate = [0] * len(refabs)
+
+            todel = []
+            for i in reversed(range(len(refabs))):
+                if refabs[i] not in roundtime:
+                    todel.append(i)
+                else:
+                    sumordinate[i] += ordinate[roundtime.index(refabs[i])]
+
+            for idx in todel:
+                del sumordinate[idx]
+                del refabs[idx]
+
+            dates = dt.date2num(t)
+            plt.gca().xaxis.set_major_formatter(dt.DateFormatter('%H:%M:%S'))
+            plt.plot(dates,ordinate,label='{}'.format(core))
+            if 'UL' in self.layer:
+                if 'GTPu' in self.layer:
+                    plt.title('UL GTP-u throughput (kbps)')
+            plt.xticks( rotation=25 )
+
+
+        plt.plot(dt.date2num(refabs), sumordinate, '--',color='red',label='total', linewidth=4)
+        plt.legend(loc='upper right',shadow=True, fancybox=True)
         #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, shadow=True, borderaxespad=0.)
 
 
@@ -139,12 +229,14 @@ class Graph:
         print "   Creating figure. This can take few seconds..."
         fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
         print "   figure created"
-        plt.subplot(3,2,1); self.drawThroughput('DL_PDCP')
-        plt.subplot(3,2,2); self.drawThroughput('UL_PDCP')
-        plt.subplot(3,2,3); self.drawThroughput('DL_RLC')
-        plt.subplot(3,2,4); self.drawThroughput('UL_RLC')
-        plt.subplot(3,2,5); self.drawThroughput('DL_MAC')
-        plt.subplot(3,2,6); self.drawThroughput('UL_MAC')
+        plt.subplot(4,2,3); self.drawThroughput('DL_PDCP')
+        plt.subplot(4,2,8); self.drawThroughput('UL_PDCP')
+        plt.subplot(4,2,5); self.drawThroughput('DL_RLC')
+        plt.subplot(4,2,6); self.drawThroughput('UL_RLC')
+        plt.subplot(4,2,7); self.drawThroughput('DL_MAC')
+        plt.subplot(4,2,4); self.drawThroughput('UL_MAC')
+        plt.subplot(4,2,1); self.drawThroughput('DL_GTPu')
+        plt.subplot(4,2,2); self.drawThroughput('UL_GTPu')
 
         #fig2 = plt.figure(2)
         #self.draw('DL_PDCP')

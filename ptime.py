@@ -48,3 +48,8 @@ class Time:
     def getTotalTime(self):
         return self.getStopTime() - self.getStartTime()
 
+    def round(self,dt=None, roundTo=60):
+         if dt == None : dt = datetime.now()
+         seconds = (dt.replace(tzinfo=None) - dt.min).seconds
+         rounding = (seconds+roundTo/2) // roundTo * roundTo
+         return dt + timedelta(0,rounding-seconds,-dt.microsecond)

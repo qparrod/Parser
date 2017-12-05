@@ -36,10 +36,10 @@ class Check:
         fd.close()
 
     def printResult(self):
-        if self.count == 0:
-            print Color.ok + "   No {}".format(self.type) + Color.nocolor
-        else:
-            print "   Number of {0:<7} : {1:}".format(self.type,self.count)
+        #if self.count == 0:
+        #    print Color.ok + "       No {}".format(self.type) + Color.nocolor
+        #else:
+            print "       Number of {0:<7} : {1:}".format(self.type,self.count)
         
 
 class Warning(Check):
@@ -75,7 +75,6 @@ class Parser:
 
     timeDelta = 2.0
 
-
     def __init__(self):
         self.regex    = ''
         self.files    = settings.files
@@ -92,7 +91,7 @@ class Parser:
     def convertToKbps(self,val):
         return val / 1024
 
-    def get(self, pos):
+    def get(self, pos, dump=False):
         import ptime
 
         values = self.search(self.line)
@@ -101,6 +100,7 @@ class Parser:
             timestamp = values[1]
             data      = values[pos]
             values = [ int(s) for s in data.split() if s.isdigit() ]
+            
             if core not in self.data:
                 self.data[core] = []
             t = ptime.Time(timestamp)
@@ -109,6 +109,9 @@ class Parser:
                 timeInDatetime   = t - i * Parser.timeDelta
                 throughputInkbps = self.convertToKbps(self.fromByteToBit(values[len(values)-1-i])/Parser.timeDelta)
                 self.data[core].append( (timeInDatetime, throughputInkbps))
+            if dump: 
+                print "".format(core)
+                print values
 
     
 
@@ -136,6 +139,10 @@ class CpuLoad(Parser):
             t = ptime.Time(timestamp)
             self.cpuload[core].append((t-0,float(load)))
 
+
+
+            
+
 def getGlobalInformation():
     found = False
     for filename in settings.files:
@@ -150,12 +157,13 @@ def getGlobalInformation():
                     if (m): settings.deployment = m.group(1)
             break
     if not found:
-         print Color.warning + "File containing deployment and board not found (udplog_Node_startup...)" + Color.nocolor
+        print Color.warning + "File containing deployment and board not found (udplog_Node_startup...)" + Color.nocolor
+    if (settings.cloud): 
+        settings.deployment = 'cBTS ' + settings.deployment 
 
 def printGlobalInformation():
     print '\033[1m'+'+'+'-'*60+'+'
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",settings.application,"|")
-    if (settings.cloud): print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("environment",":",'cloud',"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",settings.board,"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",settings.deployment,"|")
     print '+'+'-'*60+'+' + '\033[0m'
@@ -332,7 +340,11 @@ def main(argv):
 
     settings.files.sort()
 
-    if not isFolderAlreadyAnalyzed() : 
+    # check board type and deployment from startup log
+    getGlobalInformation()
+    printGlobalInformation()
+
+    if not isFolderAlreadyAnalyzed() :
         fileHistory = open('fileHistory.txt','w')
         count = 0
         for filename in settings.files:
@@ -361,14 +373,12 @@ def main(argv):
         os.makedirs(directory+'/cpuload')
         os.makedirs(directory+'/discard')
 
-        # check board type and deployment from startup log
-        getGlobalInformation()
-        printGlobalInformation()
-
         pdcppacket = PdcpPacket()
         rlcpacket  = RlcPacket()
         macpacket  = MacPacket()
+        gtppacket  = GtpPacket()
         cpuload    = CpuLoad()
+
         commonStats = Common()
 
         print Color.bold + "\nread all files containing pattern '{}'".format(settings.syslogType) + Color.nocolor
@@ -379,22 +389,27 @@ def main(argv):
                 print "\n   read filename : " + filename
                 Bar = ProgressBar(file_len(filename),60, ' ')
                 d = datetime.now()
-                with open(filename) as f:
-                    lineNumber=0
-                    for line in f:
-                        lineNumber=lineNumber+1
-                        if (lineNumber%2000==0):
-                            Bar.update(lineNumber,datetime.now() - d)
+                filter=False
+                for f in settings.fileFilter:
+                    if f in filename:
+                        filter = True
+                        break
 
-                        cpuload.getCpuLoadStats(line)
-                        pdcppacket.getPdcpThroughputFromLine(line)
-                        rlcpacket.getRlcThroughputFromLine(line)
-                        macpacket.getMacThroughputFromLine(line)
+                if not filter:
+                    with open(filename) as f:
+                        lineNumber=0
+                        for line in f:
+                            lineNumber=lineNumber+1
+                            if (lineNumber%2000==0):
+                                Bar.update(lineNumber,datetime.now() - d)
 
-                        #PHY stub
-                        # CBitrate:: ... Kilobits pers second on CellId.. 
-                    Bar.update(lineNumber,datetime.now() - d)
-                print ""
+                            cpuload.getCpuLoadStats(line)
+                            pdcppacket.getPdcpThroughputFromLine(line)
+                            rlcpacket.getRlcThroughputFromLine(line)
+                            macpacket.getMacThroughputFromLine(line)
+                            gtppacket.getGtpuThroughputFromLine(line)
+                        Bar.update(lineNumber,datetime.now() - d)
+                    print ""
                 Warning(filename)
                 Error  (filename)
                 Custom (filename)
@@ -409,10 +424,13 @@ def main(argv):
         createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
         createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
         createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
+        createCsvThroughput('UL_GTPu',gtppacket.getGtpuThroughput())
 
         createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
 
         createCsvLoad(cpuload.getCpuLoad())
+
+        
     else:
         print "\nResult folder already read and CSV for throughput and CPU load created."
         print "You can check files in csv folder where python script source file is present."
@@ -428,26 +446,26 @@ def main(argv):
 
     print "\n{} ended".format(settings.programName)
 
-def getAllUeGroup(data):
-    ueGroups = []
-    for (timestamp,uegroup,value) in data:
-        if uegroup not in ueGroups: ueGroups.append(uegroup)
-    return ueGroups
+#def getAllUeGroup(data):
+#    ueGroups = []
+#    for (timestamp,uegroup,value) in data:
+#        if uegroup not in ueGroups: ueGroups.append(uegroup)
+#    return ueGroups
 
-def getValuesFromUeGroup(data,ref):
-    values = []
-    for (timestamp,uegroup,value) in data:
-        if uegroup==ref: values.append(value)
-    return values
+#def getValuesFromUeGroup(data,ref):
+#    values = []
+#    for (timestamp,uegroup,value) in data:
+#        if uegroup==ref: values.append(value)
+#    return values
 
-def filtering(data):
-    ueGroupToFilter = []
-    ueGroups = getAllUeGroup(data)
-    for uegroup in ueGroups:
-        values = getValuesFromUeGroup(data,uegroup)
-        if all(v<0.1 for v in values):
-            ueGroupToFilter.append(uegroup)
-    return ueGroupToFilter
+#def filtering(data):
+#    ueGroupToFilter = []
+#    #ueGroups = getAllUeGroup(data)
+#    #for uegroup in ueGroups:
+#    #    values = getValuesFromUeGroup(data,uegroup)
+#    #    if all(v<0.1 for v in values):
+#    #        ueGroupToFilter.append(uegroup)
+#    return ueGroupToFilter
 
 
 def createCsv(name,type,data):
@@ -455,6 +473,7 @@ def createCsv(name,type,data):
         if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
         return
     for core in data:
+        if settings.verbose : print "    process core {} for {}".format(core,name)
         directory = ''
         header= []
         if type=="throughput" :
@@ -470,38 +489,38 @@ def createCsv(name,type,data):
             print "csv file type not recognized"
             exit()
 
-        if 'MAC' in name or 'UL_RLC' in name:
-            # special case where uegroup in present in data...
-            # this information is no everywhere in traces...
-            ueGroupToFilter = filtering(data[core])
-            ueGroups=[]
-
-            for (timestamp,ueGroup,throughput) in data[core]:
-                if(ueGroup in ueGroupToFilter):
-                    continue
-                line = (timestamp,throughput)
-                fd = 0 
-                if ueGroup not in ueGroups:
-                    ueGroups.append(ueGroup)
-                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'w')
-                    writer = csv.writer(fd)
-                    writer.writerow(header)
-                else:
-                    fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'a')
-                    writer = csv.writer(fd)
-                writer.writerow(line)
-                fd.close()
-        else:
-            if (all(e[1]<0.1 for e in data[core]) ):
-                if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
-                continue
-            fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
-            writer = csv.writer(fd)
-            writer.writerow(header)
-            for line in data[core]:
-                writer.writerow(line)
-            fd.close()
-    if settings.verbose : print "CSV file created for {} {}".format(name,type)
+        #if 'MAC' in name or 'UL_RLC' in name:
+        #    # special case where uegroup in present in data...
+        #    # this information is no everywhere in traces...
+        #    ueGroupToFilter = filtering(data[core])
+        #    ueGroups=[]
+        #
+        #    for (timestamp,ueGroup,throughput) in data[core]:
+        #        if(ueGroup in ueGroupToFilter):
+        #            continue
+        #        line = (timestamp,throughput)
+        #        fd = 0 
+        #        if ueGroup not in ueGroups:
+        #            ueGroups.append(ueGroup)
+        #            fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'w')
+        #            writer = csv.writer(fd)
+        #            writer.writerow(header)
+        #        else:
+        #            fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'a')
+        #            writer = csv.writer(fd)
+        #        writer.writerow(line)
+        #        fd.close()
+        #else:
+            #if (all(e[1]<0.1 for e in data[core]) ):
+            #    if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
+            #    continue
+        fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
+        writer = csv.writer(fd)
+        writer.writerow(header)
+        for line in data[core]:
+            writer.writerow(line)
+        fd.close()
+        if settings.verbose : print "CSV file created for {} {} (csv/{}/{}_{}_{}.csv)\n".format(name,type,directory,name,type,core)
 
 def createCsvThroughput(layerName,data):
     createCsv(layerName,'throughput',data)

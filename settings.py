@@ -16,6 +16,10 @@ def init():
     global syslogType
     global workPathNeeded
     global path
+    global SUTCores
+    global GTPCores
+    global fileFilter
+
 
     # program default values
     files          = []
@@ -32,9 +36,17 @@ def init():
     branch         = ''
     programName    = 'parser.py'
     board          = 'fsm3'
-    deployment     = 'cloud fsm3 6dsp'
+    deployment     = '6DSP'
     application    = 'syslogAnalyzer'
     syslogType     = 'udplog'
+
+    fileFilter = [ 'FSM3_RAP_reset', 'GTP_address_configuration', 'LteL2AddressConfig', 'Node_startup', 'syscomroute' ]
+
+    SUTCores = { '6DSP' : { 'DL' : ['FSP-1231','FSP-1232','FSP-1233','FSP-1234'], 'UL' : ['FSP-1242','FSP-1243'] },
+                 'cBTS 6DSP' : { 'DL' : ['LINUX-Disp_0','LINUX-Disp_1','FSP-1231','FSP-1232','FSP-1233','FSP-1234'], 'UL' : ['LINUX-Disp_0','LINUX-Disp_1','FSP-1242','FSP-1243'] }
+               }
+
+    GTPCores = { 'cBTS 6DSP' : {'DL' : ['LINUX-Disp_2'] , 'UL' : ['FSP-1264'] } }
 
 
 class Color:
