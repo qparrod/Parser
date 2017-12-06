@@ -3,11 +3,9 @@
 import re
 from layers import *
 #from pool import PoolStats
-from csvWriter import Csv
 import settings
 from settings import Color,ProgressBar
-import csv
-#import ptime
+from csvWriter import *
 
 
 def file_len(fname):
@@ -19,11 +17,11 @@ def file_len(fname):
 
 
 class Check:
-    def __init__(self):
+    def __init__(self,path):
         self.count     = 0
         self.extension = '.txt'
-        self.type      = ''
-        self.pattern   = ''
+        self.checkFile(path)
+        self.printResult()
 
     def checkFile(self, path):
         fd = open(self.type + self.extension,'a')
@@ -36,35 +34,26 @@ class Check:
         fd.close()
 
     def printResult(self):
-        #if self.count == 0:
-        #    print Color.ok + "       No {}".format(self.type) + Color.nocolor
-        #else:
-            print "       Number of {0:<7} : {1:}".format(self.type,self.count)
-        
+        print "       Number of {0:<7} : {1:}".format(self.type,self.count)
 
 class Warning(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = 'warning'
         self.patterns = ['WRN','Warning','WARNING']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
+        
 
 class Error(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = 'error'
         self.patterns = ['ERR','error','ERROR']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
 
 class Custom(Check):
     def __init__(self,path):
-        Check.__init__(self)
         self.type     = "custom"
         self.patterns = ['long event detected']
-        self.checkFile(path)
-        self.printResult()
+        Check.__init__(self,path)
 
 
 
@@ -79,11 +68,12 @@ class Parser:
         self.regex    = ''
         self.files    = settings.files
         self.regex    = None
-        self.count    = 0
         self.line     = ''
-    def search(self, _string):
-        m = self.regex.search(_string)
-        return [ m.group(i+1) for i in range(self.count) ] if m else ()
+        self.core      = None
+        self.timestamp = None
+        self.data      = None
+        #self.hasUeGroup   = False
+        #self.ueGroup  = None
 
     def fromByteToBit(self,val):
         return val * 8
@@ -113,7 +103,80 @@ class Parser:
                 print "".format(core)
                 print values
 
-    
+    def fill(self, obj):
+        if self.value:
+            if self.core not in obj:
+                obj[self.core] = []
+            for i in range(len(self.timestamp)):
+                obj[self.core].append( (self.timestamp[i], self.value[i]) )
+
+    def getValue(self,string):
+        regex = re.compile(string)
+        m = re.search(regex,self.line)
+        return m.group(1) if m else None
+
+    def get(self,regex):
+        if regex == r'': return
+        self.data      = self.getValue(regex)
+        if not self.data : return 
+        self.core      = self.getValue(r'^.*(LINUX-Disp_\d|FSP-\d+) ')
+        self.timestamp = self.getValue(r'^.*<(.*Z)> ')
+
+        if not self.core or not self.timestamp or not self.data : return
+        self.value     = [ int(s) for s in self.data.split() if s.isdigit() ] if self.data else []
+        if self.data == []: return
+        if self.timestamp :
+            import ptime
+            t = ptime.Time(self.timestamp)
+
+            self.timestamp = []
+            for i in reversed(range(len(self.value))): # len != 0 when there are 3 data for every 2 seconds
+                self.timestamp.append( t - i * Parser.timeDelta )
+
+    def calculateThroughput(self):
+        self.value = [ int(v) * 8 / 1024  / 2.0  for v in self.value ] # in kbps
+
+    def isValidData(self):
+        if not self.core or not self.timestamp or not self.data : return False
+        return True
+
+    def getDlSduThroughput(self):
+        self.get(self.dl.sdu.field)
+        if not self.isValidData() : return
+        self.calculateThroughput()
+        self.fill( self.dl.sdu.throughput )
+
+    def getDlPduThroughput(self):
+        self.get(self.dl.pdu.field)
+        if not self.isValidData() : return
+        self.calculateThroughput()
+        self.fill( self.dl.pdu.throughput )
+
+    def getUlSduThroughput(self):
+        self.get(self.ul.sdu.field)
+        if not self.isValidData() : return
+        self.calculateThroughput()
+        self.fill( self.ul.sdu.throughput )
+
+    def getUlPduThroughput(self):
+        self.get(self.ul.pdu.field)
+        if not self.isValidData() : return
+        self.calculateThroughput()
+        self.fill( self.ul.pdu.throughput )
+
+    def getDlStats(self):
+        self.getDlSduThroughput()
+        self.getDlPduThroughput()
+
+    def getUlStats(self):
+        self.getUlSduThroughput()
+        self.getUlPduThroughput()
+
+    def getStats(self,line):
+        self.line = line
+        self.getDlStats()
+        self.getUlStats()
+
 
 
 
@@ -131,7 +194,8 @@ class CpuLoad(Parser):
 
     def getCpuLoadStats(self,line):
         self.read()
-        values = self.search(line)
+        self.line = line
+        values = self.search()
         if(values!=()):
             (core,timestamp,load,max)=values
             if core not in self.cpuload:
@@ -141,7 +205,6 @@ class CpuLoad(Parser):
 
 
 
-            
 
 def getGlobalInformation():
     found = False
@@ -166,7 +229,7 @@ def printGlobalInformation():
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("application type",":",settings.application,"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("board type",":",settings.board,"|")
     print "|{0:<18}{1:>2} {2:<20}{3:>20}".format("deployment",":",settings.deployment,"|")
-    print '+'+'-'*60+'+' + '\033[0m'
+    print '+'+'-'*60+'+' + Color.nocolor
 
 def checkVersion():
     import sys
@@ -215,7 +278,7 @@ def getArguments(argv):
         elif opt == '-g':
             settings.graphAllowed = True
         elif opt in ('-w','--wcpy'):
-            settings.workPathNeeded        = True
+            settings.workPathNeeded= True
             settings.branch       = arg
         elif opt == '--dpi':
             settings.graphAllowed = True
@@ -373,12 +436,12 @@ def main(argv):
         os.makedirs(directory+'/cpuload')
         os.makedirs(directory+'/discard')
 
-        pdcppacket = PdcpPacket()
-        rlcpacket  = RlcPacket()
-        macpacket  = MacPacket()
-        gtppacket  = GtpPacket()
-        cpuload    = CpuLoad()
+        pdcp = Pdcp()
+        rlc  = Rlc()
+        mac  = Mac()
+        #gtp  = Gtp()
 
+        cpuload     = CpuLoad()
         commonStats = Common()
 
         print Color.bold + "\nread all files containing pattern '{}'".format(settings.syslogType) + Color.nocolor
@@ -389,6 +452,7 @@ def main(argv):
                 print "\n   read filename : " + filename
                 Bar = ProgressBar(file_len(filename),60, ' ')
                 d = datetime.now()
+
                 filter=False
                 for f in settings.fileFilter:
                     if f in filename:
@@ -403,13 +467,16 @@ def main(argv):
                             if (lineNumber%2000==0):
                                 Bar.update(lineNumber,datetime.now() - d)
 
-                            cpuload.getCpuLoadStats(line)
-                            pdcppacket.getPdcpThroughputFromLine(line)
-                            rlcpacket.getRlcThroughputFromLine(line)
-                            macpacket.getMacThroughputFromLine(line)
-                            gtppacket.getGtpuThroughputFromLine(line)
+                            pdcp.getStats(line)
+                            rlc.getStats(line)
+                            mac.getStats(line)
+                            #gtp.getStats(line)
+
+                            rlc.getDlSduStats(line)
+
                         Bar.update(lineNumber,datetime.now() - d)
                     print ""
+
                 Warning(filename)
                 Error  (filename)
                 Custom (filename)
@@ -418,19 +485,23 @@ def main(argv):
 
         commonStats.printStatistics()
 
-        createCsvThroughput('DL_PDCP',pdcppacket.getDlPdcpThroughput())
-        createCsvThroughput('UL_PDCP',pdcppacket.getUlPdcpThroughput())
-        createCsvThroughput('DL_RLC',rlcpacket.getDlRlcThroughput())
-        createCsvThroughput('UL_RLC',rlcpacket.getUlRlcThroughput())
-        createCsvThroughput('DL_MAC',macpacket.getDlMacThroughput())
-        createCsvThroughput('UL_MAC',macpacket.getUlMacThroughput())
-        createCsvThroughput('UL_GTPu',gtppacket.getGtpuThroughput())
+        csvwriter = Csv()
+        csvwriter.createCsvThroughput('downlink PDCP SDU',pdcp.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink PDCP PDU',pdcp.dl.pdu.throughput)
+        csvwriter.createCsvThroughput('downlink RLC SDU',rlc.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink RLC PDU',rlc.dl.pdu.throughput)
+        csvwriter.createCsvThroughput('downlink MAC SDU',mac.dl.sdu.throughput)
+        csvwriter.createCsvThroughput('downlink MAC PDU',mac.dl.pdu.throughput)
+        csvwriter.createCsvThroughput('uplink PDCP SDU',pdcp.ul.sdu.throughput)
+        csvwriter.createCsvThroughput('uplink PDCP PDU',pdcp.ul.pdu.throughput)
+        csvwriter.createCsvThroughput('uplink RLC SDU',rlc.ul.sdu.throughput)
+        csvwriter.createCsvThroughput('uplink RLC PDU',rlc.ul.pdu.throughput)
+        csvwriter.createCsvThroughput('uplink MAC SDU',mac.ul.sdu.throughput)
+        csvwriter.createCsvThroughput('uplink MAC PDU',mac.ul.pdu.throughput)
 
-        createCsv('DL_PDCP','discard',pdcppacket.getDlDiscard())
+        #createCsvLoad(cpuload.getCpuLoad())
+        #csvwriter.createCsvLoad(cpuload.getCpuLoad())
 
-        createCsvLoad(cpuload.getCpuLoad())
-
-        
     else:
         print "\nResult folder already read and CSV for throughput and CPU load created."
         print "You can check files in csv folder where python script source file is present."
@@ -445,89 +516,6 @@ def main(argv):
             g.drawFigure()
 
     print "\n{} ended".format(settings.programName)
-
-#def getAllUeGroup(data):
-#    ueGroups = []
-#    for (timestamp,uegroup,value) in data:
-#        if uegroup not in ueGroups: ueGroups.append(uegroup)
-#    return ueGroups
-
-#def getValuesFromUeGroup(data,ref):
-#    values = []
-#    for (timestamp,uegroup,value) in data:
-#        if uegroup==ref: values.append(value)
-#    return values
-
-#def filtering(data):
-#    ueGroupToFilter = []
-#    #ueGroups = getAllUeGroup(data)
-#    #for uegroup in ueGroups:
-#    #    values = getValuesFromUeGroup(data,uegroup)
-#    #    if all(v<0.1 for v in values):
-#    #        ueGroupToFilter.append(uegroup)
-#    return ueGroupToFilter
-
-
-def createCsv(name,type,data):
-    if data == {}:
-        if settings.verbose : print Color.warning + "no data collected for {} {}".format(name,type) + Color.nocolor
-        return
-    for core in data:
-        if settings.verbose : print "    process core {} for {}".format(core,name)
-        directory = ''
-        header= []
-        if type=="throughput" :
-            directory = 'throughput'
-            header = ['timestamp','{} {} in kbps for core {}'.format(name,type,core)]
-        elif type=="load" :
-            directory = 'cpuload'
-            header = ['timestamp','{} {} in % for core {}'.format(name,type,core)]
-        elif type == 'discard' :
-            directory = 'discard'
-            header = ['timestamp','{} {} for core {}'.format(name,type,core)]
-        else:
-            print "csv file type not recognized"
-            exit()
-
-        #if 'MAC' in name or 'UL_RLC' in name:
-        #    # special case where uegroup in present in data...
-        #    # this information is no everywhere in traces...
-        #    ueGroupToFilter = filtering(data[core])
-        #    ueGroups=[]
-        #
-        #    for (timestamp,ueGroup,throughput) in data[core]:
-        #        if(ueGroup in ueGroupToFilter):
-        #            continue
-        #        line = (timestamp,throughput)
-        #        fd = 0 
-        #        if ueGroup not in ueGroups:
-        #            ueGroups.append(ueGroup)
-        #            fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'w')
-        #            writer = csv.writer(fd)
-        #            writer.writerow(header)
-        #        else:
-        #            fd = open('csv/{}/{}_{}_{}_ueGroup{}.csv'.format(directory,name,type,core,ueGroup),'a')
-        #            writer = csv.writer(fd)
-        #        writer.writerow(line)
-        #        fd.close()
-        #else:
-            #if (all(e[1]<0.1 for e in data[core]) ):
-            #    if settings.verbose: print "{}: data always 0.0 for core {} -> filtered".format(name,core)
-            #    continue
-        fd = open('csv/{}/{}_{}_{}.csv'.format(directory,name,type,core),'w')
-        writer = csv.writer(fd)
-        writer.writerow(header)
-        for line in data[core]:
-            writer.writerow(line)
-        fd.close()
-        if settings.verbose : print "CSV file created for {} {} (csv/{}/{}_{}_{}.csv)\n".format(name,type,directory,name,type,core)
-
-def createCsvThroughput(layerName,data):
-    createCsv(layerName,'throughput',data)
-
-def createCsvLoad(data):
-    createCsv('CPU','load',data)
-
 
 if __name__ == "__main__":
     settings.init()

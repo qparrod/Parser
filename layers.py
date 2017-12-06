@@ -54,180 +54,139 @@ class Common(Parser):
         + Color.bold + '+----------------------------------------+----------------------------------------+\n' + Color.nocolor
         print stats
 
-class PdcpPacket(Parser):
+class Stats:
+    def __init__(self):
+        self.srbSduData = 0
+
+class Packet:
+    def __init__(self):
+        self.throughput     = {}
+        self.numberOfPacket = {}
+        self.discard        = {}
+        self.field          = ''
+
+
+class Sdu(Packet):
+    def __init__(self):
+        Packet.__init__(self)
+
+class Pdu(Packet):
+    def __init__(self):
+        Packet.__init__(self)
+
+class Dl:
+    def __init__(self):
+        self.sdu = Sdu()
+        self.pdu = Pdu()
+
+class Ul:
+    def __init__(self):
+        self.sdu = Sdu()
+        self.pdu = Pdu()
+
+
+
+class Pdcp(Parser):
     def __init__(self):
         Parser.__init__(self)
-        self.dlpdcpthroughput = {}
-        self.ulpdcpthroughput = {}
-        self.dldiscard = {}
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DISCARD/DL: SR: (\d+) OOD: (\d+) OOM X2: (\d+) drb: (\d+) srb: (\d+) gtpu: (\d+)')
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: SRB toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK#1: (\d+ \d+ \d+) NACK#2: (\d+ \d+ \d+)')
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) SA SwQ/Tx/Rx: \d+/\d+/\d+ \d+/\d+/\d+ \d+/\d+/\d+ \[\d+\] WinStall: (\d+ \d+ \d+)')
-        #self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+) SR: (\d+) RoHCF: (\d+) toSGW: (\d+ \d+ \d+) Fwd: (\d+ \d+ \d+) BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
+        self.dl = Dl()
+        self.ul = Ul()
 
-    def setDl(self):
-        import settings
-        self.data  = self.dlpdcpthroughput
-        if settings.cloud:
-            self.regex = re.compile(r'VM-.+ (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)')
-            self.count = 9
-        else:
-            self.regex = re.compile(r'FSP-\d+ <(.*)>.*PDCP/STATS/DL: DRB S1: (\d+ \d+ \d+) X2: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) toRLC: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+) ACK: (\d+ \d+ \d+) NACK: (\d+ \d+ \d+)') 
-            self.count = 8
-
-    def setDiscardSdu(self):
-        self.data  = self.dldiscard
-        self.regex = re.compile(r'VM-.+ (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/DISCARD/DL: SDU: T (\d+ \d+ \d+) PDU: A (\d+ \d+ \d+) T (\d+ \d+ \d+)')
-        self.count = 4
-
-    def setUl(self):
-        self.data  = self.ulpdcpthroughput
-        self.regex = re.compile(r'VM-.+ (LINUX-Disp_\d) <(.*)>.*PDCP/STATS/UL: DataPDU: (\d+ \d+ \d+) inBytes: (\d+ \d+ \d+)')
-        self.count = 4
-
-    def noReceived(self):
-        return sum(element for element in self.map['receive']) if 'receive' in self.map.keys() else 0
-
-    def noSent(self):
-        return sum(element for element in self.map['send']) if 'send' in self.map.keys() else 0
-
-    def averageReceived(self):
-        return self.noReceived(self)/len(self.map['receive']) if len(self.map['receive'])!= 0 else 0
-
-    def averageReceived(self):
-        return self.noReceived(self)/len(self.map['send']) if len(self.map['send'])!= 0 else 0
-
-    def getPdcpThroughputFromLine(self, line):
-        self.line = line 
-
-        self.setDl()
-        self.get(4) #inbytes
-
-        self.setUl()
-        self.get(3) #DataPDU in bytes
-
-        self.setDiscardSdu()
-        self.get(2)
-
-
-    def getDlPdcpThroughput(self):
-        return self.dlpdcpthroughput
-
-    def getUlPdcpThroughput(self):
-        return self.ulpdcpthroughput
-
-    def getDlDiscard(self):
-        return self.dldiscard
+        self.dl.sdu.field = r'DRB.*X2:.*inBytes: (\d+ \d+ \d+) toRLC:'
+        self.dl.pdu.field = r'DRB.*toRLC:.*inBytes: (\d+ \d+ \d+) ACK:'
+        self.ul.sdu.field = r''
+        self.ul.pdu.field = r'UL:.*inBytes: (\d+ \d+ \d+)' # Warning not available in product code. need a delivery before
 
 
 
-
-class RlcPacket(Parser):
+class Rlc(Parser):
     def __init__(self):
-        self.dlrlcthroughput  = {}
-        self.ulrlcthroughput = {}
+        Parser.__init__(self)
+        self.dl = Dl()
+        self.dl.sdu.field = r'RLC/STATS/DL: RCVD: (\d+ \d+ \d+)'
+        self.dl.pdu.field = r'DLUE STATS 1.*8:(\d+)'
 
-    def setDl(self):
-        self.data  = self.dlrlcthroughput
-        self.regex = re.compile(r'(FSP-\d+|VM-.*).*<(.*)>.*RLC/STATS/DL: RCVD: (\d+ \d+ \d+) RCVP: (\d+ \d+ \d+) ACKD: (\d+ \d+ \d+) ACKP: (\d+ \d+ \d+)')
-        self.count = 6
+        self.ul = Ul()
+        self.ul.sdu.field = r'ULUE STATS 2.*1:(\d+)'
+        self.ul.pdu.field = r'ULUE STATS 1.*8:(\d+)'
 
-    def readUlRcvdRcvp(self):
-        self.count = 0
+        self.stats = Stats()
+        self.stats.receivedTBs  = r'ULUE STATS 1/.*1:(\d+)'
+        self.stats.crcFails     = r'ULUE STATS 1/.*2:(\d+)'
+        self.stats.msg3s        = r'ULUE STATS 1/.*3:(\d+)'
+        self.stats.MacCEs       = r'ULUE STATS 1/.*4:(\d+)'
+        self.stats.paddingData  = r'ULUE STATS 1/.*5:(\d+)'
+        self.stats.nokMacHeader = r'ULUE STATS 1/.*6:(\d+)'
+        self.stats.rlcPdus      = r'ULUE STATS 1/.*7:(\d+)'
+        self.stats.drbSdus      = r'ULUE STATS 1/.*8:(\d+)'
 
-    #def readBuffer(self):
-    #    self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*RLC/STATS/DL: BuffPkt: (\d+ \d+ \d+) BuffData: (\d+ \d+ \d+)')
-    #    self.count = 4
+        self.stats.srbSdus       = r'ULUE STATS 2/.*2:(\d+)'
+        self.stats.srbSduData    = r'ULUE STATS 2/.*3:(\d+)'
+        self.stats.uplinkNack    = r'ULUE STATS 2/.*4:(\d+)'
+        self.stats.lostUmPdus    = r'ULUE STATS 2/.*5:(\d+)'
+        self.stats.forwardedSdus = r'ULUE STATS 2/.*6:(\d+)'
+        self.stats.amPduSegments = r'ULUE STATS 2/.*7:(\d+)'
+        self.stats.nokRlcHeader  = r'ULUE STATS 2/.*8:(\d+)'
+        self.stats.discardedPdu  = r'ULUE STATS 2/.*9:(\d+)'
 
-    def setUl(self):
-        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 1/.*x(\d)lF.*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)')
-        self.count = 12
-
-    def getRlcThroughputFromLine(self,line):
+    def getDlSduStats(self,line):
         self.line = line
-        self.setDl()
-        self.get(2) # rcvd
+        self.get(self.stats.receivedTBs)
+        if self.isValidData(): Common.receivedTBs += int(self.value[0])
+        self.get(self.stats.crcFails)
+        if self.isValidData(): Common.crcFails += int(self.value[0])
+        self.get(self.stats.msg3s)
+        if self.isValidData(): Common.msg3s += int(self.value[0])
+        self.get(self.stats.MacCEs)
+        if self.isValidData(): Common.MacCEs += int(self.value[0])
+        self.get(self.stats.paddingData)
+        if self.isValidData(): Common.paddingData += int(self.value[0])
+        self.get(self.stats.nokMacHeader)
+        if self.isValidData(): Common.nokMacHeader += int(self.value[0])
+        self.get(self.stats.rlcPdus)
+        if self.isValidData(): Common.rlcPdus += int(self.value[0])
+        self.get(self.stats.drbSdus)
+        if self.isValidData(): Common.drbSdus += int(self.value[0])
 
-        self.setUl()
-        values = self.search(line)
-        if(values!=()):
-            (core,timestamp,ueGroup,recTBs,crcFails,msg3s,MacCEs,paddingData,NOK_MacHdrs,rlcPdus,rlcPduData,drbSdus)=values
-            if core not in self.ulrlcthroughput:
-                self.ulrlcthroughput[core] = []
-            t = ptime.Time(timestamp)
-            #self.ulrlcthroughput[core].append((t-0,ueGroup,fromByteToBit(int(rlcPduData))/2.0/1024))
-            self.ulrlcthroughput[core].append((t-0,fromByteToBit(int(rlcPduData))/2.0/1024))
-            Common.receivedTBs  += int(recTBs)
-            Common.crcFails     += int(crcFails)
-            Common.msg3s        += int(msg3s)
-            Common.MacCEs       += int(MacCEs)
-            Common.paddingData  += int(paddingData)
-            Common.nokMacHeader += int(NOK_MacHdrs)
-            Common.rlcPdus      += int(rlcPdus)
-            Common.drbSdus      += int(drbSdus)
-
-    def getDlRlcThroughput(self):
-        return self.dlrlcthroughput
-
-    def getUlRlcThroughput(self):
-        return self.ulrlcthroughput
+        self.get(self.stats.srbSduData)
+        if self.isValidData(): Common.srbSduData += int(self.value[0])
+        self.get(self.stats.discardedPdu)
+        if self.isValidData(): Common.discardedPdu += int(self.value[0])
+        self.get(self.stats.srbSdus)
+        if self.isValidData(): Common.srbSdus += int(self.value[0])
+        self.get(self.stats.uplinkNack)
+        if self.isValidData(): Common.uplinkNack += int(self.value[0])
+        self.get(self.stats.amPduSegments)
+        if self.isValidData(): Common.amPduSegments += int(self.value[0])
+        self.get(self.stats.nokRlcHeader)
+        if self.isValidData(): Common.nokRlcHeader += int(self.value[0])
+        self.get(self.stats.forwardedSdus)
+        if self.isValidData(): Common.forwardedSdus += int(self.value[0])
+        self.get(self.stats.lostUmPdus)
+        if self.isValidData(): Common.lostUmPdus += int(self.value[0])
 
 
-class MacPacket(Parser):
+class Mac(Parser):
     def __init__(self):
-        self.count = 0
-        self.dlmacthroughput   = {}
-        self.ulmacthroughput = {}
+        Parser.__init__(self)
+        self.dl = Dl()
+        self.dl.sdu.field = r'DLUE STATS 1/.*8:(\d+)'
+        self.dl.pdu.field = r''
 
-    def readReceivedData(self):
-        self.regex = re.compile(r'(FSP-\d+|VM-\d+).*<(.*)>.*DLUE STATS 1/.*x(\d)lF.*/1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+) 10:(\d+)')
-        self.count = 13
-
-    def readUlThroughputP2(self):
-        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*ULUE STATS 2/.*x(\d).*1:(\d+) 2:(\d+) 3:(\d+) 4:(\d+) 5:(\d+) 6:(\d+) 7:(\d+) 8:(\d+) 9:(\d+)') # MAC
-        self.count = 12
-    
-    def getMacThroughputFromLine(self,line):
-        self.readReceivedData()
-        values = self.search(line)
-        if(values!=()):
-            (core,timestamp,ueGroup,receivedData,receivedPackets,ackedData,ackedPacket,nackedData,nackedPacket,amountOfBufferedSdus,amountOfBufferedData,amountOfWastedMemory,lostBsrCount)=values
-            if core not in self.dlmacthroughput:
-                self.dlmacthroughput[core] = []
-            t = ptime.Time(timestamp)
-            #self.dlmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(receivedData))/2.0/1024))
-            self.dlmacthroughput[core].append((t-0,fromByteToBit(int(receivedData))/2.0/1024))
-
-        self.readUlThroughputP2()
-        values = self.search(line)
-        if values!=():
-            (core,timestamp,ueGroup,drbSduData,srbSdus,srbSduData,UlNack,lostUmPdus,forwardedSdus,AmPduSegments,NOK_RlcHdrs,discPdus)=values
-            if core not in self.ulmacthroughput:
-                self.ulmacthroughput[core] = []
-            t = ptime.Time(timestamp)
-            #self.ulmacthroughput[core].append((t-0,ueGroup,fromByteToBit(int(drbSduData))/2.0/1024))
-            self.ulmacthroughput[core].append((t-0,fromByteToBit(int(drbSduData))/2.0/1024))
-            Common.srbSduData    += int(srbSduData)
-            Common.discardedPdu  += int(discPdus)
-            Common.srbSdus       += int(srbSdus)
-            Common.uplinkNack    += int(UlNack)
-            Common.amPduSegments += int(AmPduSegments)
-            Common.nokRlcHeader  += int(NOK_RlcHdrs)
-            Common.forwardedSdus += int(forwardedSdus)
-            Common.lostUmPdus    += int(lostUmPdus)
-
-    def getDlMacThroughput(self):
-        return self.dlmacthroughput
-
-    def getUlMacThroughput(self):
-        return self.ulmacthroughput
+        self.ul = Ul()
+        self.ul.sdu.field = r'ULUE STATS 1/.*1:(\d+)'
+        self.ul.pdu.field = r''
         
-
-class GtpPacket(Parser):
+'''
+class Gtp(Parser):
     def __init__(self):
-        self.count=0
-        self.ulgtpthroughput = {}
+        Parser.__init__(self)
+        self.ul = Ul()
+        self.dl = Dl()
+        #self.count=0
+        #self.ulgtpthroughput = {}
+        self.ul.sdu.field = r'DataGen/STATS.*Mbps.+=(\d+)'
+
 
     def readUl(self):
         self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*DataGen/STATS.*CPU_load=.*%.*Mbps.+=(\d+) pps=(\d+)') # GTPu from data generator
@@ -245,3 +204,4 @@ class GtpPacket(Parser):
 
     def getGtpuThroughput(self):
         return self.ulgtpthroughput
+'''

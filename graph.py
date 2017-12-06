@@ -8,49 +8,26 @@ class Graph:
     def __init__(self):
         self.data = {}
         self.layer = ''
-        #self.ueGroup = ''
-
-    def exit(self):
-        import curses
-        curses.nocbreak()
-        self.screen.keypad(0)
-        curses.echo()
-        curses.endwin()
-
-
-    def drawBoxes(self):
-        v_box = 10
-        h_box = h_max
-        scr_boxes = []
-        v_box_origin = 0
-        h_box_origin = 0
-        box_space = 0
-
-        while(v_box_origin+v_box<v_max):
-            scr = curses.newwin(v_box,h_box,v_box_origin,h_box_origin)
-            scr.border('|','|','_','_','|','|','|','|')
-            scr_boxes.append(scr)
-            v_box_origin += v_box + box_space -1
-         
-        for scr in scr_boxes:
-            scr.refresh()
-        scr_boxes[-1].getch()
 
     def getDataFromFile(self,filePath):
         import csv
-        with open(filePath,'r') as csvfile:
-            r = csv.reader(csvfile, delimiter=',') 
-            
-            if self.core not in self.data:
-                self.data[self.core] = []
-            for row  in r:
-                if len(row) != 2:
-                    print "wrong csv format for {}".format(self.layer)
-                    exit()
-                # retrieve header
-                if row[0] == 'timestamp':
-                    continue
-                self.data[self.core].append(row)
+
+        try:
+            with open(filePath,'r') as csvfile:
+                r = csv.reader(csvfile, delimiter=',') 
+                
+                if self.core not in self.data:
+                    self.data[self.core] = []
+                for row  in r:
+                    if len(row) != 2:
+                        print "wrong csv format for {}".format(self.layer)
+                        exit()
+                    # retrieve header
+                    if row[0] == 'timestamp':
+                        continue
+                    self.data[self.core].append(row)
+        except IOError as e:
+            print Color.error+ "I/O error({}): {}: {}".format(e.errno, e.strerror,filePath) + Color.nocolor
 
     def getThroughputData(self,layer):
         self.layer = layer
@@ -89,36 +66,54 @@ class Graph:
 
     def getDirection(self,layer):
         direction = None
-        if 'DL' in layer:   direction = 'DL'
-        elif 'UL' in layer: direction = 'UL'
+        if 'downlink' in layer: direction = 'DL'
+        elif 'uplink' in layer: direction = 'UL'
         else:
             print "throughput direction not recognized in layer ({})".format(layer)
             exit()
         return direction
+        
 
+    def drawTitles(self):
+        import matplotlib.pyplot as plt
+        if 'downlink' or 'DL' or 'dl' in self.layer:
+            if 'PDCP' in self.layer:
+                plt.title('DL PDCP PDU throughput (kbps)')
+            elif 'RLC' in self.layer:
+                plt.title('DL RLC throughput (kbps)')
+            elif 'MAC' in self.layer:
+                plt.title('DL MAC throughput (kbps)')
+        elif 'uplink' or 'UL' or 'ul' in self.layer:
+            if 'PDCP' in self.layer:
+                plt.title('UL PDCP PDU throughput (kbps)')
+            elif 'RLC' in self.layer:
+                plt.title('UL RLC PDU throughput (kbps)')
+            elif 'MAC' in self.layer:
+                plt.title('UL MAC throughput (kbps)')
 
-    def drawThroughput(self,layer):
-        if settings.verbose : print "\n\n   graph: draw throughput {}".format(layer)
+    def getValuesToDraw(self,layer):
+        if settings.verbose : print "\n\n   graph: getValuesToDraw for {}".format(layer)
         self.getThroughputData(layer)
 
         import matplotlib.dates as dt
-        import matplotlib.pyplot as plt
 
-        dates       = []
         sumordinate = []
         refabs      = []
+        result = {}
 
         # SUT
         sut_cores = settings.SUTCores[settings.deployment][self.getDirection(layer)]
         for core in self.data:
-            if core not in sut_cores: continue
+            if core not in sut_cores:
+                if settings.verbose: print "core {} filtered {} {} -> {}".format(core,settings.deployment,layer,self.getDirection(layer))
+                continue
 
             absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core] ]
             ordinate = [float(data[1]) for data in self.data[core] ]
 
             t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ] 
 
-            roundtime = [ ptime.Time().round(i,roundTo=1) for i in t ]
+            roundtime     = [ ptime.Time().round(i,roundTo=1) for i in t ]
             roundordinate = ordinate[:] # copy all the list
 
             # filter tuples by aggregating values
@@ -131,7 +126,6 @@ class Graph:
                 del roundtime[i]
                 del roundordinate[i]
 
-
             # create sum of plots
             if len(sumordinate) == 0:
                 refabs = roundtime[:]
@@ -142,248 +136,70 @@ class Graph:
                 if refabs[i] not in roundtime:
                     todel.append(i)
                 else:
-                    sumordinate[i] += ordinate[roundtime.index(refabs[i])]
+                    sumordinate[i] += roundordinate[roundtime.index(refabs[i])]
 
             for idx in todel:
                 del sumordinate[idx]
                 del refabs[idx]
 
-            dates = dt.date2num(t)
+            if core not in result:
+                result[core] = zip(dt.date2num(t),ordinate)
+
+            total = zip(dt.date2num(refabs), sumordinate)
+        return result, total
+
+
+
+    def draw(self,values, total):
+        import matplotlib.dates as dt
+        import matplotlib.pyplot as plt
+
+        for core in values:
+            x = [ value[0] for value in values[core] ]
+            y = [ value[1] for value in values[core] ]
 
             plt.gca().xaxis.set_major_formatter(dt.DateFormatter('%H:%M:%S'))
-            plt.plot(dates,ordinate,label='{}'.format(core))
-            if 'DL' in self.layer:
-                if 'PDCP' in self.layer:
-                    plt.title('DL PDCP PDU throughput (kbps)')
-                elif 'RLC' in self.layer:
-                    plt.title('DL RLC throughput (kbps)')
-                elif 'MAC' in self.layer:
-                    plt.title('DL MAC throughput (kbps)')
-            elif 'UL' in self.layer:
-                if 'PDCP' in self.layer:
-                    plt.title('UL PDCP PDU throughput (kbps)')
-                elif 'RLC' in self.layer:
-                    plt.title('UL RLC PDU throughput (kbps)')
-                elif 'MAC' in self.layer:
-                    plt.title('UL MAC throughput (kbps)')
+            plt.plot(x, y, label=core)
+            plt.ylabel('throughput in kbps')
             plt.xticks( rotation=25 )
+            self.drawTitles()
 
-        # GTP
-        gtp_cores = settings.GTPCores[settings.deployment][self.getDirection(layer)]
-        for core in self.data:
-            if core not in gtp_cores: continue
-            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertTimestampFromStringToTime(data[0]) for data in self.data[core] ]
-            ordinate = [float(data[1]) for data in self.data[core] ]
-            t = [ ptime.Time(format='%H:%M:%S').convertLocalTime(i) for i in absciss ]
-
-            roundtime = [ ptime.Time().round(i,roundTo=1) for i in t ]
-            roundordinate = ordinate[:] # copy all the list
-
-            # filter tuples by aggregating values
-            todel = []
-            for i in range(len(roundtime)):
-                if i+1 < len(roundtime) and roundtime[i]==roundtime[i+1]:
-                    roundordinate[i+1] += roundordinate[i]
-                    todel.append(i)
-            for i in reversed(todel):
-                del roundtime[i]
-                del roundordinate[i]
-
-
-            # create sum of plots
-            if len(sumordinate) == 0:
-                refabs = roundtime[:]
-                sumordinate = [0] * len(refabs)
-
-            todel = []
-            for i in reversed(range(len(refabs))):
-                if refabs[i] not in roundtime:
-                    todel.append(i)
-                else:
-                    sumordinate[i] += ordinate[roundtime.index(refabs[i])]
-
-            for idx in todel:
-                del sumordinate[idx]
-                del refabs[idx]
-
-            dates = dt.date2num(t)
-            plt.gca().xaxis.set_major_formatter(dt.DateFormatter('%H:%M:%S'))
-            plt.plot(dates,ordinate,label='{}'.format(core))
-            if 'UL' in self.layer:
-                if 'GTPu' in self.layer:
-                    plt.title('UL GTP-u throughput (kbps)')
-            plt.xticks( rotation=25 )
-
-
-        plt.plot(dt.date2num(refabs), sumordinate, '--',color='red',label='total', linewidth=4)
+        x = [ v[0] for v in total ]
+        y = [ v[1] for v in total ]
+        plt.plot(x, y, '--',color='red',label='total', linewidth=4)
         plt.legend(loc='upper right',shadow=True, fancybox=True)
-        #plt.legend(bbox_to_anchor=(1.05, 1), loc=2, shadow=True, borderaxespad=0.)
+
 
 
     def drawFigure(self):
         import matplotlib.pyplot as plt
         import settings
 
-        mydpi = settings.dpi 
-        if settings.verbose : print "   DPI (dots per inch) for images set to {}.".format(mydpi)
-        print "   Creating figure. This can take few seconds..."
-        fig = plt.figure(1,figsize=(800/mydpi,800/mydpi),dpi=mydpi)
-        print "   figure created"
-        plt.subplot(4,2,3); self.drawThroughput('DL_PDCP')
-        plt.subplot(4,2,8); self.drawThroughput('UL_PDCP')
-        plt.subplot(4,2,5); self.drawThroughput('DL_RLC')
-        plt.subplot(4,2,6); self.drawThroughput('UL_RLC')
-        plt.subplot(4,2,7); self.drawThroughput('DL_MAC')
-        plt.subplot(4,2,4); self.drawThroughput('UL_MAC')
-        plt.subplot(4,2,1); self.drawThroughput('DL_GTPu')
-        plt.subplot(4,2,2); self.drawThroughput('UL_GTPu')
+        dlpdcpsduvalues, total_dlpdcpsduvalues = self.getValuesToDraw('downlink PDCP SDU')
+        ulpdcpsduvalues, total_ulpdcpsduvalues = self.getValuesToDraw('uplink PDCP SDU')
+        dlrlcsduvalues, total_dlrlcsduvalues   = self.getValuesToDraw('downlink RLC SDU')
+        ulrlcsduvalues, total_ulrlcsduvalues   = self.getValuesToDraw('uplink RLC SDU')
+        dlmacsduvalues, total_dlmacsduvalues   = self.getValuesToDraw('downlink MAC SDU')
+        ulmacsduvalues, total_ulmacsduvalues   = self.getValuesToDraw('uplink MAC SDU')
+
+        if settings.plot : 
+            mydpi = settings.dpi 
+            if settings.verbose : print "   DPI (dots per inch) for images set to {}.".format(mydpi)
+            print "   Creating figure. This can take few seconds..."
+            fig = plt.figure(1,figsize=(800/mydpi,1000/mydpi),dpi=mydpi)
+            print "   figure created"
+            plt.suptitle('throughput in SUT',fontsize=16)
+            plt.subplot(3,2,1); self.draw(dlpdcpsduvalues, total_dlpdcpsduvalues)
+            plt.subplot(3,2,2); self.draw(ulpdcpsduvalues, total_ulpdcpsduvalues)
+            plt.subplot(3,2,3); self.draw(dlrlcsduvalues, total_dlrlcsduvalues)
+            plt.subplot(3,2,4); self.draw(ulrlcsduvalues, total_ulrlcsduvalues)
+            plt.subplot(3,2,5); self.draw(dlmacsduvalues, total_dlmacsduvalues)
+            plt.subplot(3,2,6); self.draw(ulmacsduvalues, total_ulmacsduvalues)
+
+            plt.show()
+
 
         #fig2 = plt.figure(2)
         #self.draw('DL_PDCP')
         
         if settings.png  : fig.savefig('throughput.png', dpi=100)
-        if settings.plot : plt.show()
-
-
-    def printAxes(self):
-        self.screen.addstr(self.Y(self.v_size+1),self.X(0),'^')
-        self.screen.vline(self.Y(self.v_size-1),self.X(0),'|',self.v_size)
-        self.screen.addstr(self.Y(0),self.X(0),'|')
-        self.screen.hline(self.Y(0),self.X(1),'_',self.h_size)
-        self.screen.addstr(self.Y(0),self.X(self.h_size),'>')
-
-    def printLegend(self,xlegend,ylegend):
-        self.screen.addstr(self.Y(-2),self.X(0.5*(self.h_size-len(xlegend))),xlegend)
-        self.screen.addstr(self.Y(self.v_size),self.X(2),ylegend)
-
-    def X(self,x):
-        X = int(self.x_origin + x)
-        (Ymax,Xmax) = self.screen.getmaxyx()
-        if X > Xmax or X < 0:
-            raise RuntimeError("invalid conversion from x={} to X={} -> max={}".format(x,X,Xmax))
-            self.exit()
-        return X
-
-    def Y(self,y):
-        Y = int(self.y_origin + self.v_size - y)
-        (Ymax,Xmax) = self.screen.getmaxyx()
-        if Y > Ymax or Y < 0:
-            self.exit()
-            raise RuntimeError("invalid conversion from y={} to Y={} -> max={}".format(y,Y,Ymax))
-        return Y
-
-    def convertCoord(self,x,y):
-        return (self.X(x),self.Y(y))
-
-    def convertCoordList(self,list_x, list_y):
-        coord_list = zip(list_x,list_y)
-        return [(self.X(x),self.Y(y)) for x,y in coord_list]
-
-    def printXRange(self,min,max):
-        mintime = ptime.Time(format='%H:%M:%S').convertLocalTimeToTime(min)#time.strftime('%H:%M:%S',time.localtime(min))
-        self.screen.addstr(self.Y(-1),self.X(0),mintime)
-
-        maxtime = ptime.Time(format='%H:%M:%S').convertLocalTimeToTime(max) #time.strftime('%H:%M:%S',time.localtime(max))
-        self.screen.addstr(self.Y(-1),self.X(self.h_size-len(maxtime)),maxtime)
-
-    def printYRange(self,min,max):
-        self.screen.addstr(self.Y(self.v_size),self.X(-1-len(str(int(max)))), str(int(max)))
-        self.screen.addstr(self.Y(0)          ,self.X(-1-len(str(int(min)))), str(int(min)))
-
-    def consoleInit(self):
-        self.x_origin = 10
-        self.y_origin = 2
-        self.x_limit = 4
-        self.y_limit = 5
-        (v_max,h_max) = self.screen.getmaxyx()
-        self.h_size = h_max-self.x_limit-self.x_origin-1
-        self.v_size = v_max-self.y_limit-self.y_origin-1
-
-    def getMaxLength(self):
-        l = 0
-        for core in self.data:
-            if (l ==0 ):
-                l = len(self.data[core])
-            if (l!=0 and l!=len(self.data[core])):
-                print "values have not same size: {} != {}".format(l,len(self.data[core]))
-                self.exit()
-        return l
-
-    def drawConsole(self,layer):
-        import curses
-
-        self.screen = curses.initscr()
-        curses.start_color()
-        self.consoleInit()
-
-        (v_max,h_max) = self.screen.getmaxyx()
-
-        self.screen.clear()
-        self.screen.border('|','|','-','-','+','+','+','+')
-        
-        self.screen.addstr(self.Y(v_max-6),self.X(20),"{} throughput ({},{}) ".format(layer,v_max,h_max))
-
-        self.printAxes()
-        self.printLegend('time','throughput in kbps')
-
-        color = [curses.COLOR_RED,curses.COLOR_GREEN,curses.COLOR_BLUE,curses.COLOR_CYAN,curses.COLOR_MAGENTA,curses.COLOR_YELLOW]
-        curses.init_pair(1, color[1], curses.COLOR_BLACK)
-        curses.init_pair(2, color[2], curses.COLOR_BLACK)
-        curses.init_pair(3, color[3], curses.COLOR_BLACK)
-        curses.init_pair(4, color[4], curses.COLOR_BLACK)
-        curses.init_pair(5, color[5], curses.COLOR_BLACK)
-        
-        self.getData(layer)
-
-        l = self.getMaxLength()
-        sumordinate = [0] * l
-
-        # Calculate time to print in console
-        import sys
-        hmax = 0
-        hmin = sys.maxint
-        vmax=0
-        vmin= sys.maxint
-        for core in self.data:
-            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertFromStringToLocalTime(pair[0]) for pair in self.data[core] ]
-            ordinate = [float(pair[1]) for pair in self.data[core]] # values to plot
-            sumordinate = [e1 + e2 for e1,e2 in zip(sumordinate,ordinate)]
-            hmin = min(hmin,min(absciss))
-            hmax = max(hmax,max(absciss))
-            vmin = min(vmin,min(ordinate))
-            vmax = max(vmax,max(sumordinate))
-        hstep = float((hmax-hmin)/self.h_size)
-        vstep = float((vmax-vmin)/self.v_size)
-
-        # print ranges
-        self.printYRange(vmin,vmax)
-        self.printXRange(hmin,hmax)
-
-
-        colorIdx = 0
-        for core in self.data:
-            colorIdx += 1
-            absciss = [ ptime.Time(format='%Y-%m-%d %H:%M:%S.%f').convertFromStringToLocalTime(pair[0]) for pair in self.data[core] ]
-            ordinate = [float(pair[1]) for pair in self.data[core]] # value to plot
-
-            coord = zip(absciss,ordinate)
-            for x,y in coord:
-                xpos = int((x-min(absciss))/hstep)
-                ypos = int((y-min(ordinate))/vstep)
-                self.screen.addstr(self.Y(ypos),self.X(xpos),'+',curses.color_pair(colorIdx))
-                
-        # print sum
-        colorIdx += 1
-        tmp = (0,0)
-        sum = zip(absciss,sumordinate)
-        for x,y in sum:
-            xpos = int((x - min(absciss)) / hstep)
-            ypos = int((y - min(sumordinate)) / vstep )
-            
-            self.screen.addstr(self.Y(ypos),self.X(xpos),'*',curses.color_pair(colorIdx))
-            tmp = (xpos,ypos)
-
-        self.screen.refresh()
-        self.screen.getch()
-
-        self.exit()
