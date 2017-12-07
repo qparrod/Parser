@@ -181,6 +181,7 @@ class Parser:
 
 
 class CpuLoad(Parser):
+    '''
     def __init__(self):
         Parser.__init__(self)
         self.cpuload = {} 
@@ -202,6 +203,11 @@ class CpuLoad(Parser):
                 self.cpuload[core] = []
             t = ptime.Time(timestamp)
             self.cpuload[core].append((t-0,float(load)))
+    '''
+
+    def __init__(self):
+        Parser.__init__(self)
+        self.stats = r'DLUE STATS 1/.*8:(\d+)'
 
 
 
@@ -247,6 +253,7 @@ def usage():
     print "   -w|--wcpy          set working copy name e.g /var/fpwork/user/<wcpy_name>/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "   -t|--type          set syslog type. SyslogAnalyzer will check all file with this type in filename. By default set to 'udplog'"
     print "                      This could be also a file extension. For instance '.log' or '.txt'"
+    print "   -f|--file          select a specific file to analyze. Example: -f /var/fpwork/user/test.txt"
     print "   -p|--path          instead of following working copy folder with -w option, this parameter set all path e.g /path/to/result/folder"
     print "   -g                 enable graphical mode which open figures"
     print "   -c                 show graphs on console. Need -g option."
@@ -264,7 +271,7 @@ def getArguments(argv):
     import sys
     import getopt
     try:
-        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:vt:",["application=","board=","wcpy=","png","dpi=","show","clear","type","path","cloud"])
+        opts, args = getopt.getopt(argv,"hi:a:b:gw:cmp:vt:f:",["application=","board=","wcpy=","png","dpi=","show","clear","type","path","cloud","file"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -278,8 +285,8 @@ def getArguments(argv):
         elif opt == '-g':
             settings.graphAllowed = True
         elif opt in ('-w','--wcpy'):
-            settings.workPathNeeded= True
-            settings.branch       = arg
+            settings.workPathNeeded = True
+            settings.branch         = arg
         elif opt == '--dpi':
             settings.graphAllowed = True
             settings.dpi          = int(arg)
@@ -293,6 +300,8 @@ def getArguments(argv):
             settings.path         = arg
         elif opt in ('-t', "--type"):
             settings.syslogType   = arg
+        elif opt in ('-f', "--file"):
+            settings.file         = arg
         elif opt in ("-a", "--application"):
             settings.application  = arg
             if settings.application not in ("syslogAnalyzer","eventAnalyzer","comparePerf"):
@@ -321,8 +330,9 @@ def printSelectedArguments():
         else : print "    file type is udplog [default]"
         if settings.graphAllowed and settings.dpi != 50  : print "    DPI set to {} (--dpi)".format(settings.dpi)
         elif settings.graphAllowed and settings.dpi == 50 : print "    DPI set to 50 [default]"
-        if settings.path !='' : print "    path '{}'' selected (-p)".format(settings.path)
+        if settings.path !='' : print "    path '{}' selected (-p)".format(settings.path)
         if settings.graphAllowed and settings.console : print "    graph will be displayed on console (-c)"
+        if settings.file !='' : print "    file {} is selected (-f)".format(settings.file)
 
 
 def isFolderAlreadyAnalyzed():
@@ -398,10 +408,12 @@ def main(argv):
         settings.files = [os.path.join(dirpath,name) for name in filenames]
         break
    
-    checkFileNumber()
-    checkFileType()
-
-    settings.files.sort()
+    if settings.file == '': 
+        checkFileNumber()
+        checkFileType()
+        settings.files.sort()
+    else:
+        settings.files.append(settings.file)
 
     # check board type and deployment from startup log
     getGlobalInformation()
@@ -474,6 +486,8 @@ def main(argv):
 
                             rlc.getDlSduStats(line)
 
+                            #cpuload.getStats(line)
+
                         Bar.update(lineNumber,datetime.now() - d)
                     print ""
 
@@ -499,7 +513,7 @@ def main(argv):
         csvwriter.createCsvThroughput('uplink MAC SDU',mac.ul.sdu.throughput)
         csvwriter.createCsvThroughput('uplink MAC PDU',mac.ul.pdu.throughput)
 
-        #createCsvLoad(cpuload.getCpuLoad())
+
         #csvwriter.createCsvLoad(cpuload.getCpuLoad())
 
     else:

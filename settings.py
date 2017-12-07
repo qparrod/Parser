@@ -19,6 +19,7 @@ def init():
     global SUTCores
     global GTPCores
     global fileFilter
+    global file
 
 
     # program default values
@@ -39,6 +40,7 @@ def init():
     deployment     = '6DSP'
     application    = 'syslogAnalyzer'
     syslogType     = 'udplog'
+    file           = ''
 
     fileFilter = [ 'FSM3_RAP_reset', 'GTP_address_configuration', 'LteL2AddressConfig', 'Node_startup', 'syscomroute' ]
 

@@ -74,25 +74,28 @@ class Graph:
         return direction
         
 
-    def drawTitles(self):
+    def drawTitle(self):
         import matplotlib.pyplot as plt
-        if 'downlink' or 'DL' or 'dl' in self.layer:
+        if 'downlink' in self.layer:
             if 'PDCP' in self.layer:
                 plt.title('DL PDCP PDU throughput (kbps)')
             elif 'RLC' in self.layer:
                 plt.title('DL RLC throughput (kbps)')
             elif 'MAC' in self.layer:
                 plt.title('DL MAC throughput (kbps)')
-        elif 'uplink' or 'UL' or 'ul' in self.layer:
+        elif 'uplink' in self.layer:
             if 'PDCP' in self.layer:
                 plt.title('UL PDCP PDU throughput (kbps)')
             elif 'RLC' in self.layer:
                 plt.title('UL RLC PDU throughput (kbps)')
             elif 'MAC' in self.layer:
                 plt.title('UL MAC throughput (kbps)')
+        else:
+            print "ERROR in choosing graph title"
+            exit()
 
     def getValuesToDraw(self,layer):
-        if settings.verbose : print "\n\n   graph: getValuesToDraw for {}".format(layer)
+        if settings.verbose : print "\n   graph: getValuesToDraw for {}".format(layer)
         self.getThroughputData(layer)
 
         import matplotlib.dates as dt
@@ -100,6 +103,7 @@ class Graph:
         sumordinate = []
         refabs      = []
         result = {}
+        total = None
 
         # SUT
         sut_cores = settings.SUTCores[settings.deployment][self.getDirection(layer)]
@@ -146,13 +150,20 @@ class Graph:
                 result[core] = zip(dt.date2num(t),ordinate)
 
             total = zip(dt.date2num(refabs), sumordinate)
+        if settings.verbose: print "     {} graphs to plot for {}".format(len(result),layer)
         return result, total
 
 
 
-    def draw(self,values, total):
+    def draw(self, values, total, layer):
         import matplotlib.dates as dt
         import matplotlib.pyplot as plt
+
+        if len(values) == 0:
+            if settings.verbose: print "no value to draw"
+            return
+
+        self.layer = layer
 
         for core in values:
             x = [ value[0] for value in values[core] ]
@@ -162,11 +173,13 @@ class Graph:
             plt.plot(x, y, label=core)
             plt.ylabel('throughput in kbps')
             plt.xticks( rotation=25 )
-            self.drawTitles()
+            self.drawTitle()
 
-        x = [ v[0] for v in total ]
-        y = [ v[1] for v in total ]
-        plt.plot(x, y, '--',color='red',label='total', linewidth=4)
+        if total != None:
+            x = [ v[0] for v in total ]
+            y = [ v[1] for v in total ]
+            plt.plot(x, y, '--',color='red',label='total', linewidth=4)
+
         plt.legend(loc='upper right',shadow=True, fancybox=True)
 
 
@@ -189,12 +202,12 @@ class Graph:
             fig = plt.figure(1,figsize=(800/mydpi,1000/mydpi),dpi=mydpi)
             print "   figure created"
             plt.suptitle('throughput in SUT',fontsize=16)
-            plt.subplot(3,2,1); self.draw(dlpdcpsduvalues, total_dlpdcpsduvalues)
-            plt.subplot(3,2,2); self.draw(ulpdcpsduvalues, total_ulpdcpsduvalues)
-            plt.subplot(3,2,3); self.draw(dlrlcsduvalues, total_dlrlcsduvalues)
-            plt.subplot(3,2,4); self.draw(ulrlcsduvalues, total_ulrlcsduvalues)
-            plt.subplot(3,2,5); self.draw(dlmacsduvalues, total_dlmacsduvalues)
-            plt.subplot(3,2,6); self.draw(ulmacsduvalues, total_ulmacsduvalues)
+            plt.subplot(3,2,1); self.draw(dlpdcpsduvalues, total_dlpdcpsduvalues,'downlink PDCP SDU')
+            plt.subplot(3,2,2); self.draw(ulpdcpsduvalues, total_ulpdcpsduvalues,'uplink PDCP SDU')
+            plt.subplot(3,2,3); self.draw(dlrlcsduvalues, total_dlrlcsduvalues,'downlink RLC SDU')
+            plt.subplot(3,2,4); self.draw(ulrlcsduvalues, total_ulrlcsduvalues,'uplink RLC SDU')
+            plt.subplot(3,2,5); self.draw(dlmacsduvalues, total_dlmacsduvalues,'downlink MAC SDU')
+            plt.subplot(3,2,6); self.draw(ulmacsduvalues, total_ulmacsduvalues,'uplink MAC SDU')
 
             plt.show()
 
