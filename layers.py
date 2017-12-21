@@ -7,7 +7,7 @@ import ptime
 def fromByteToBit(val):
     return val * 8
 
-class Common(Parser):
+class Common:
     srbSduData    = 0
     receivedTBs   = 0
     srbSdus       = 0
@@ -25,8 +25,8 @@ class Common(Parser):
     nokRlcHeader  = 0
     forwardedSdus = 0
 
-    def __init__(self):
-        Parser.__init__(self)
+    #def __init__(self):
+    #    Parser.__init__(self)
 
     def printStatistics(self):
         from settings import Color
@@ -54,9 +54,36 @@ class Common(Parser):
         + Color.bold + '+----------------------------------------+----------------------------------------+\n' + Color.nocolor
         print stats
 
+class PdcpStats:
+    dlbuffPkt = 0
+    ulbuffPkt = 0
+
+    def printStatistics(self):
+        from settings import Color
+        pipe = Color.bold + "|" + Color.nocolor 
+        stats =  Color.bold + "   Other statistics:\n" \
+        + "+---------------------------------------------------------------------------------+\n"\
+        + "|                                    PDCP                                         |\n"\
+        + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor \
+        + pipe + "  DL buffered packet  = {0:<55}  ".format(PdcpStats.dlbuffPkt) + pipe + '\n'\
+        + pipe + "  UL buffered packet  = {0:<55}  ".format(PdcpStats.ulbuffPkt) + pipe + '\n'\
+        + Color.bold \
+        + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor
+        print stats
+
+
+class DlStats:
+    pass
+
+class UlStats:
+    pass
+
+
+
 class Stats:
     def __init__(self):
-        self.srbSduData = 0
+        self.dl = DlStats()
+        self.ul = UlStats()
 
 class Packet:
     def __init__(self):
@@ -86,7 +113,9 @@ class Ul:
 
 
 
+
 class Pdcp(Parser):
+
     def __init__(self):
         Parser.__init__(self)
         self.dl = Dl()
@@ -97,6 +126,22 @@ class Pdcp(Parser):
         self.ul.sdu.field = r''
         self.ul.pdu.field = r'UL:.*inBytes: (\d+ \d+ \d+)' # Warning not available in product code. need a delivery before
 
+        self.stats = Stats()
+        self.stats.dl.buffPkt   = r'PDCP/STATS/DL: BuffPkt: ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.ul.buffPkt   = r'PDCP/STATS/UL:.*BuffPkt: ([-]?\d+ [-]?\d+ [-]?\d+)'
+
+    def getDlStatistics(self,line):
+        self.line = line
+        self.get(self.stats.dl.buffPkt)
+        if self.isValidData():
+            PdcpStats.dlbuffPkt += self.value[0]
+
+    def getUlStatistics(self,line):
+        self.line = line
+        self.get(self.stats.ul.buffPkt)
+        if self.isValidData():
+            PdcpStats.ulbuffPkt += self.value[0]
+    
 
 
 class Rlc(Parser):

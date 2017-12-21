@@ -1,6 +1,0 @@
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_FSM3_RAP_reset_20170621-193640.txt
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_GTP_address_configuration_20170621-193928.txt
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_LteL2AddressConfig_20170621-193926.txt
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_Node_startup_20170621-193640.txt
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_cBTS_FSMF_3_B_20170621-193936.txt
-/var/fpwork/qparrod/LTE3081-R-b/C_Test/SC_LTEL2/Sct/RobotTests/results/udplog_syscomroute_20170621-193918.txt

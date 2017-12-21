@@ -123,7 +123,7 @@ class Parser:
         self.timestamp = self.getValue(r'^.*<(.*Z)> ')
 
         if not self.core or not self.timestamp or not self.data : return
-        self.value     = [ int(s) for s in self.data.split() if s.isdigit() ] if self.data else []
+        self.value     = [ int(s) for s in self.data.split() ] if self.data else []
         if self.data == []: return
         if self.timestamp :
             import ptime
@@ -176,7 +176,6 @@ class Parser:
         self.line = line
         self.getDlStats()
         self.getUlStats()
-
 
 
 
@@ -387,6 +386,23 @@ def setPath():
             settings.path = "/var/fpwork/"+ str(user) + "/"+settings.branch+"/C_Test/SC_LTEL2/Sct/RobotTests/results"
     print "reference folder path for analysis : " + Color.bold + settings.path + Color.nocolor
 
+def createHistoryFile():
+    fileHistory = open('fileHistory.txt','w')
+    count = 0
+    for filename in settings.files:
+        if settings.syslogType in filename:
+            count += 1
+            fileHistory.write(filename+'\n')
+    fileHistory.close()
+    return count
+
+def checkFileCount(count):
+    if settings.verbose : print "number of '{}' files in path: {}".format(settings.syslogType,count)
+    if count == 0:
+        print Color.error + "\nNo file found. Exiting now." 
+        print "Take care on -f, -p or -w options" + Color.nocolor
+        exit()
+
 def main(argv):
     import os
     os.system('clear')
@@ -420,15 +436,8 @@ def main(argv):
     printGlobalInformation()
 
     if not isFolderAlreadyAnalyzed() :
-        fileHistory = open('fileHistory.txt','w')
-        count = 0
-        for filename in settings.files:
-            if settings.syslogType in filename:
-                count += 1
-                fileHistory.write(filename+'\n')
-        fileHistory.close()
-        if settings.verbose : print "number of '{}' files in path: {}".format(settings.syslogType,count)
-
+        count = createHistoryFile()
+        checkFileCount(count)
     
         csvDirectory='csv'
         directory=csvDirectory
@@ -455,6 +464,7 @@ def main(argv):
 
         cpuload     = CpuLoad()
         commonStats = Common()
+        pdcpStats   = PdcpStats()
 
         print Color.bold + "\nread all files containing pattern '{}'".format(settings.syslogType) + Color.nocolor
         from datetime import datetime
@@ -484,6 +494,9 @@ def main(argv):
                             mac.getStats(line)
                             #gtp.getStats(line)
 
+
+                            pdcp.getDlStatistics(line)
+                            pdcp.getUlStatistics(line)
                             rlc.getDlSduStats(line)
 
                             #cpuload.getStats(line)
@@ -497,6 +510,7 @@ def main(argv):
         totalTime = datetime.now() - totalTime
         print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
 
+        pdcpStats.printStatistics()
         commonStats.printStatistics()
 
         csvwriter = Csv()
