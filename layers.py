@@ -55,8 +55,25 @@ class Common:
         print stats
 
 class PdcpStats:
+    # DL
     dlbuffPkt = 0
+    SDUTimerBasedDiscard = 0
+    DLPDUAqmDiscard = 0
+    DLPDUTimerBasedDiscard = 0
+    DrbPdcpPduDiscardDueToStatusReport = 0
+    DrbPdcpPduOutOfPdcpDescriptors = 0
+    OutOfMemory = 0
+    DLTotalDrbDiscard = 0
+    DLTotalSrbDiscard = 0
+    DLTotalGtpuDiscard = 0
+    incomingPDCPSdu = 0
+    DrbPdcpPduNacked = 0
+    DrbPdcpPduAcked = 0
+
+    # UL
     ulbuffPkt = 0
+    PdcpPduStatusReport = 0
+    PdcpPduRohcFeedback = 0
 
     def printStatistics(self):
         from settings import Color
@@ -65,8 +82,24 @@ class PdcpStats:
         + "+---------------------------------------------------------------------------------+\n"\
         + "|                                    PDCP                                         |\n"\
         + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor \
-        + pipe + "  DL buffered packet  = {0:<55}  ".format(PdcpStats.dlbuffPkt) + pipe + '\n'\
-        + pipe + "  UL buffered packet  = {0:<55}  ".format(PdcpStats.ulbuffPkt) + pipe + '\n'\
+        + pipe + "  DL buffered packet                             = {0:<28}  ".format(PdcpStats.dlbuffPkt) + pipe + '\n'\
+        + pipe + "  DL SDU Timer Based Discard                     = {0:<28}  ".format(PdcpStats.SDUTimerBasedDiscard)    + pipe + '\n'\
+        + pipe + "  DL PDU Aqm discard                             = {0:<28}  ".format(PdcpStats.DLPDUAqmDiscard)        +pipe+ '\n'\
+        + pipe + "  DL PDU Timer Based Discard                     = {0:<28}  ".format(PdcpStats.DLPDUTimerBasedDiscard)    + pipe + '\n'\
+        + pipe + "  DL drb Pdcp Pdu Discard due to Status Report   = {0:<28}  ".format(PdcpStats.DrbPdcpPduDiscardDueToStatusReport) +pipe  + '\n'\
+        + pipe + "  DL drb Pdcp Pdu Out Of Pdcp Descriptors        = {0:<28}  ".format(PdcpStats.DrbPdcpPduOutOfPdcpDescriptors)    + pipe  + '\n'\
+        + pipe + "  DL Out Of Memory for Trsw Uplane Send Data msg = {0:<28}  ".format(PdcpStats.OutOfMemory)   + pipe+ '\n' \
+        + pipe + "  DL total drb discard                           = {0:<28}  ".format(PdcpStats.DLTotalDrbDiscard)    + pipe+ '\n'  \
+        + pipe + "  DL total srb discard                           = {0:<28}  ".format(PdcpStats.DLTotalSrbDiscard)      +pipe+ '\n'  \
+        + pipe + "  DL total gtpu discard                          = {0:<28}  ".format(PdcpStats.DLTotalGtpuDiscard)    + pipe + '\n' \
+        + pipe + "  DL incoming PDCP Sdu                           = {0:<28}  ".format(PdcpStats.incomingPDCPSdu)     + pipe+ '\n'   \
+        + pipe + "  DL Drb Pdcp pdu nacked max retrains exceeded   = {0:<28}  ".format(PdcpStats.DrbPdcpPduNacked)    + pipe+ '\n'  \
+        + pipe + "  DL Drb Pdcp acked by Rlc                       = {0:<28}  ".format(PdcpStats.DrbPdcpPduAcked)  +pipe   + '\n'   \
+        + Color.bold \
+        + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor \
+        + pipe + "  UL buffered packet                             = {0:<28}  ".format(PdcpStats.ulbuffPkt) + pipe + '\n'\
+        + pipe + "  UL pdcp pdu status report                      = {0:<28}  ".format(PdcpStats.PdcpPduStatusReport) + pipe + '\n'\
+        + pipe + "  UL pdcp pdu feedback                           = {0:<28}  ".format(PdcpStats.PdcpPduRohcFeedback) + pipe + '\n'\
         + Color.bold \
         + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor
         print stats
@@ -112,7 +145,8 @@ class Ul:
         self.pdu = Pdu()
 
 
-
+class Discard:
+    pass
 
 class Pdcp(Parser):
 
@@ -130,17 +164,77 @@ class Pdcp(Parser):
         self.stats.dl.buffPkt   = r'PDCP/STATS/DL: BuffPkt: ([-]?\d+ [-]?\d+ [-]?\d+)'
         self.stats.ul.buffPkt   = r'PDCP/STATS/UL:.*BuffPkt: ([-]?\d+ [-]?\d+ [-]?\d+)'
 
+        self.stats.dl.discard = Discard()
+        self.stats.dl.discard.SduT = r'PDCP/STATS/DISCARD/DL: SDU: T ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.dl.discard.PduA = r'PDCP/STATS/DISCARD/DL:.*PDU: A ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.dl.discard.PduT = r'PDCP/STATS/DISCARD/DL:.*PDU:.*T ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.dl.discard.SR   = r'PDCP/STATS/DISCARD/DL: SR: ([-]?\d+)'
+        self.stats.dl.discard.OOD  = r'PDCP/STATS/DISCARD/DL:.*OOD: ([-]?\d+)'
+        self.stats.dl.discard.OOM  = r'PDCP/STATS/DISCARD/DL:.*OOM: ([-]?\d+)'
+        self.stats.dl.discard.drb  = r'PDCP/STATS/DISCARD/DL:.*OOM: ([-]?\d+)'
+        self.stats.dl.discard.srb  = r'PDCP/STATS/DISCARD/DL:.*drb: ([-]?\d+)'
+        self.stats.dl.discard.gtpu = r'PDCP/STATS/DISCARD/DL:.*gtpu: ([-]?\d+)'
+
+        self.stats.dl.drbS1 = r'PDCP/STATS/DL: DRB S1: ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.dl.nack  = r'PDCP/STATS/DL:.*NACK: ([-]?\d+ [-]?\d+ [-]?\d+)'
+        self.stats.dl.ack   = r'PDCP/STATS/DL:.*ACK: ([-]?\d+ [-]?\d+ [-]?\d+)'
+
+
+        self.stats.ul.sr   = r'PDCP/STATS/UL:.*SR: ([-]?\d+)'
+        self.stats.ul.rohc = r'PDCP/STATS/UL:.*RoHCF: ([-]?\d+)'
+
     def getDlStatistics(self,line):
         self.line = line
         self.get(self.stats.dl.buffPkt)
-        if self.isValidData():
-            PdcpStats.dlbuffPkt += self.value[0]
+        if self.isValidData(): PdcpStats.dlbuffPkt += sum(self.value)
+
+        self.get(self.stats.dl.discard.SduT)
+        if self.isValidData(): PdcpStats.SDUTimerBasedDiscard += sum(self.value)
+        self.get(self.stats.dl.discard.PduA)
+        if self.isValidData(): PdcpStats.DLPDUAqmDiscard += sum(self.value)
+        self.get(self.stats.dl.discard.PduT)
+        if self.isValidData(): PdcpStats.DLPDUTimerBasedDiscard += sum(self.value)
+        self.get(self.stats.dl.discard.SR)
+        if self.isValidData(): PdcpStats.DrbPdcpPduDiscardDueToStatusReport += sum(self.value)
+        self.get(self.stats.dl.discard.OOD)
+        if self.isValidData(): PdcpStats.DrbPdcpPduOutOfPdcpDescriptors += sum(self.value)
+        self.get(self.stats.dl.discard.OOM)
+        if self.isValidData(): PdcpStats.OutOfMemory += sum(self.value)
+        self.get(self.stats.dl.discard.drb)
+        if self.isValidData(): PdcpStats.DLTotalDrbDiscard += sum(self.value)
+        self.get(self.stats.dl.discard.srb)
+        if self.isValidData(): PdcpStats.DLTotalSrbDiscard += sum(self.value)
+        self.get(self.stats.dl.discard.gtpu)
+        if self.isValidData(): PdcpStats.DLTotalGtpuDiscard += sum(self.value)
+
+        self.get(self.stats.dl.drbS1)
+        if self.isValidData(): PdcpStats.incomingPDCPSdu += sum(self.value)
+        self.get(self.stats.dl.nack)
+        if self.isValidData(): PdcpStats.DrbPdcpPduNacked += sum(self.value)
+        self.get(self.stats.dl.ack)
+        if self.isValidData(): PdcpStats.DrbPdcpPduAcked += sum(self.value)
+
 
     def getUlStatistics(self,line):
         self.line = line
         self.get(self.stats.ul.buffPkt)
-        if self.isValidData():
-            PdcpStats.ulbuffPkt += self.value[0]
+        if self.isValidData(): PdcpStats.ulbuffPkt += sum(self.value)
+
+        self.get(self.stats.ul.sr)
+        if self.isValidData(): PdcpStats.PdcpPduStatusReport += sum(self.value)
+        self.get(self.stats.ul.rohc)
+        if self.isValidData(): PdcpStats.PdcpPduRohcFeedback += sum(self.value)
+        '''
+        self.get(self.stats.ul.)
+        if self.isValidData(): PdcpStats. += sum(self.value)
+        self.get(self.stats.ul.)
+        if self.isValidData(): PdcpStats. += sum(self.value)
+        self.get(self.stats.ul.)
+        if self.isValidData(): PdcpStats. += sum(self.value)
+        self.get(self.stats.ul.)
+        if self.isValidData(): PdcpStats. += sum(self.value)
+        '''
+
     
 
 
