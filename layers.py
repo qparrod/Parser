@@ -25,32 +25,30 @@ class Common:
     nokRlcHeader  = 0
     forwardedSdus = 0
 
-    #def __init__(self):
-    #    Parser.__init__(self)
-
-    def printStatistics(self):
+    @classmethod
+    def printStatistics(cls):
         from settings import Color
         pipe = Color.bold + "|" + Color.nocolor 
         stats =  Color.bold + "   Other statistics:\n" \
         + "+----------------------------------------+----------------------------------------+\n" \
         + "|                MAC                     |                RLC                     |\n"\
         + "+----------------------------------------+----------------------------------------+\n"+ Color.nocolor\
-        + pipe + "  total received TB      = {0:<11}  ".format(Common.receivedTBs)   \
-        + pipe + "  total SRB SDUs         = {0:<11}  ".format(Common.srbSdus)       + pipe + '\n'\
-        + pipe + "  total CRC failures     = {0:<11}  ".format(Common.crcFails)      \
-        + pipe + "  total SRB SDU data     = {0:<11}  ".format(Common.srbSduData)    + pipe + '\n' \
-        + pipe + "  total msg3s            = {0:<11}  ".format(Common.msg3s)         \
-        + pipe + "  total UL NACK          = {0:<11}  ".format(Common.uplinkNack)    + pipe + '\n' \
-        + pipe + "  total MAC CEs          = {0:<11}  ".format(Common.MacCEs)        \
-        + pipe + "  total lost UM PDUs     = {0:<11}  ".format(Common.lostUmPdus)    + pipe + '\n' \
-        + pipe + "  total paddingData      = {0:<11}  ".format(Common.paddingData)   \
-        + pipe + "  total forwarded SDUs   = {0:<11}  ".format(Common.forwardedSdus) + pipe + '\n' \
-        + pipe + "  total NOK Mac Headers  = {0:<11}  ".format(Common.nokMacHeader)  \
-        + pipe + "  total AM PDU segments  = {0:<11}  ".format(Common.amPduSegments) + pipe + '\n' \
-        + pipe + "  total RLC PDUs         = {0:<11}  ".format(Common.rlcPdus)       \
-        + pipe + "  total NOK RLC Header   = {0:<11}  ".format(Common.nokRlcHeader)  + pipe + '\n' \
-        + pipe + "  total DRB SDUs         = {0:<11}  ".format(Common.drbSdus)       \
-        + pipe + "  total discarded PDU    = {0:<11}  ".format(Common.discardedPdu)  + pipe + '\n' \
+        + pipe + "  total received TB      = {0:<11}  ".format(cls.receivedTBs)   \
+        + pipe + "  total SRB SDUs         = {0:<11}  ".format(cls.srbSdus)       + pipe + '\n'\
+        + pipe + "  total CRC failures     = {0:<11}  ".format(cls.crcFails)      \
+        + pipe + "  total SRB SDU data     = {0:<11}  ".format(cls.srbSduData)    + pipe + '\n' \
+        + pipe + "  total msg3s            = {0:<11}  ".format(cls.msg3s)         \
+        + pipe + "  total UL NACK          = {0:<11}  ".format(cls.uplinkNack)    + pipe + '\n' \
+        + pipe + "  total MAC CEs          = {0:<11}  ".format(cls.MacCEs)        \
+        + pipe + "  total lost UM PDUs     = {0:<11}  ".format(cls.lostUmPdus)    + pipe + '\n' \
+        + pipe + "  total paddingData      = {0:<11}  ".format(cls.paddingData)   \
+        + pipe + "  total forwarded SDUs   = {0:<11}  ".format(cls.forwardedSdus) + pipe + '\n' \
+        + pipe + "  total NOK Mac Headers  = {0:<11}  ".format(cls.nokMacHeader)  \
+        + pipe + "  total AM PDU segments  = {0:<11}  ".format(cls.amPduSegments) + pipe + '\n' \
+        + pipe + "  total RLC PDUs         = {0:<11}  ".format(cls.rlcPdus)       \
+        + pipe + "  total NOK RLC Header   = {0:<11}  ".format(cls.nokRlcHeader)  + pipe + '\n' \
+        + pipe + "  total DRB SDUs         = {0:<11}  ".format(cls.drbSdus)       \
+        + pipe + "  total discarded PDU    = {0:<11}  ".format(cls.discardedPdu)  + pipe + '\n' \
         + Color.bold + '+----------------------------------------+----------------------------------------+\n' + Color.nocolor
         print stats
 
@@ -75,31 +73,32 @@ class PdcpStats:
     PdcpPduStatusReport = 0
     PdcpPduRohcFeedback = 0
 
-    def printStatistics(self):
+    @classmethod
+    def printStatistics(cls):
         from settings import Color
         pipe = Color.bold + "|" + Color.nocolor 
         stats =  Color.bold + "   Other statistics:\n" \
         + "+---------------------------------------------------------------------------------+\n"\
         + "|                                    PDCP                                         |\n"\
         + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor \
-        + pipe + "  DL buffered packet                             = {0:<28}  ".format(PdcpStats.dlbuffPkt) + pipe + '\n'\
-        + pipe + "  DL SDU Timer Based Discard                     = {0:<28}  ".format(PdcpStats.SDUTimerBasedDiscard)    + pipe + '\n'\
-        + pipe + "  DL PDU Aqm discard                             = {0:<28}  ".format(PdcpStats.DLPDUAqmDiscard)        +pipe+ '\n'\
-        + pipe + "  DL PDU Timer Based Discard                     = {0:<28}  ".format(PdcpStats.DLPDUTimerBasedDiscard)    + pipe + '\n'\
-        + pipe + "  DL drb Pdcp Pdu Discard due to Status Report   = {0:<28}  ".format(PdcpStats.DrbPdcpPduDiscardDueToStatusReport) +pipe  + '\n'\
-        + pipe + "  DL drb Pdcp Pdu Out Of Pdcp Descriptors        = {0:<28}  ".format(PdcpStats.DrbPdcpPduOutOfPdcpDescriptors)    + pipe  + '\n'\
-        + pipe + "  DL Out Of Memory for Trsw Uplane Send Data msg = {0:<28}  ".format(PdcpStats.OutOfMemory)   + pipe+ '\n' \
-        + pipe + "  DL total drb discard                           = {0:<28}  ".format(PdcpStats.DLTotalDrbDiscard)    + pipe+ '\n'  \
-        + pipe + "  DL total srb discard                           = {0:<28}  ".format(PdcpStats.DLTotalSrbDiscard)      +pipe+ '\n'  \
-        + pipe + "  DL total gtpu discard                          = {0:<28}  ".format(PdcpStats.DLTotalGtpuDiscard)    + pipe + '\n' \
-        + pipe + "  DL incoming PDCP Sdu                           = {0:<28}  ".format(PdcpStats.incomingPDCPSdu)     + pipe+ '\n'   \
-        + pipe + "  DL Drb Pdcp pdu nacked max retrains exceeded   = {0:<28}  ".format(PdcpStats.DrbPdcpPduNacked)    + pipe+ '\n'  \
-        + pipe + "  DL Drb Pdcp acked by Rlc                       = {0:<28}  ".format(PdcpStats.DrbPdcpPduAcked)  +pipe   + '\n'   \
+        + pipe + "  DL buffered packet                             = {0:<28}  ".format(cls.dlbuffPkt) + pipe + '\n'\
+        + pipe + "  DL SDU Timer Based Discard                     = {0:<28}  ".format(cls.SDUTimerBasedDiscard)    + pipe + '\n'\
+        + pipe + "  DL PDU Aqm discard                             = {0:<28}  ".format(cls.DLPDUAqmDiscard)        +pipe+ '\n'\
+        + pipe + "  DL PDU Timer Based Discard                     = {0:<28}  ".format(cls.DLPDUTimerBasedDiscard)    + pipe + '\n'\
+        + pipe + "  DL drb Pdcp Pdu Discard due to Status Report   = {0:<28}  ".format(cls.DrbPdcpPduDiscardDueToStatusReport) +pipe  + '\n'\
+        + pipe + "  DL drb Pdcp Pdu Out Of Pdcp Descriptors        = {0:<28}  ".format(cls.DrbPdcpPduOutOfPdcpDescriptors)    + pipe  + '\n'\
+        + pipe + "  DL Out Of Memory for Trsw Uplane Send Data msg = {0:<28}  ".format(cls.OutOfMemory)   + pipe+ '\n' \
+        + pipe + "  DL total drb discard                           = {0:<28}  ".format(cls.DLTotalDrbDiscard)    + pipe+ '\n'  \
+        + pipe + "  DL total srb discard                           = {0:<28}  ".format(cls.DLTotalSrbDiscard)      +pipe+ '\n'  \
+        + pipe + "  DL total gtpu discard                          = {0:<28}  ".format(cls.DLTotalGtpuDiscard)    + pipe + '\n' \
+        + pipe + "  DL incoming PDCP Sdu                           = {0:<28}  ".format(cls.incomingPDCPSdu)     + pipe+ '\n'   \
+        + pipe + "  DL Drb Pdcp pdu nacked max retrains exceeded   = {0:<28}  ".format(cls.DrbPdcpPduNacked)    + pipe+ '\n'  \
+        + pipe + "  DL Drb Pdcp acked by Rlc                       = {0:<28}  ".format(cls.DrbPdcpPduAcked)  +pipe   + '\n'   \
         + Color.bold \
         + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor \
-        + pipe + "  UL buffered packet                             = {0:<28}  ".format(PdcpStats.ulbuffPkt) + pipe + '\n'\
-        + pipe + "  UL pdcp pdu status report                      = {0:<28}  ".format(PdcpStats.PdcpPduStatusReport) + pipe + '\n'\
-        + pipe + "  UL pdcp pdu feedback                           = {0:<28}  ".format(PdcpStats.PdcpPduRohcFeedback) + pipe + '\n'\
+        + pipe + "  UL buffered packet                             = {0:<28}  ".format(cls.ulbuffPkt) + pipe + '\n'\
+        + pipe + "  UL pdcp pdu status report                      = {0:<28}  ".format(cls.PdcpPduStatusReport) + pipe + '\n'\
+        + pipe + "  UL pdcp pdu feedback                           = {0:<28}  ".format(cls.PdcpPduRohcFeedback) + pipe + '\n'\
         + Color.bold \
         + "+---------------------------------------------------------------------------------+\n"+ Color.nocolor
         print stats

@@ -463,8 +463,6 @@ def main(argv):
         #gtp  = Gtp()
 
         cpuload     = CpuLoad()
-        commonStats = Common()
-        pdcpStats   = PdcpStats()
 
         print Color.bold + "\nread all files containing pattern '{}'".format(settings.syslogType) + Color.nocolor
         from datetime import datetime
@@ -510,8 +508,8 @@ def main(argv):
         totalTime = datetime.now() - totalTime
         print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
 
-        pdcpStats.printStatistics()
-        commonStats.printStatistics()
+        PdcpStats.printStatistics()
+        Common.printStatistics()
 
         csvwriter = Csv()
         csvwriter.createCsvThroughput('downlink PDCP SDU',pdcp.dl.sdu.throughput)
