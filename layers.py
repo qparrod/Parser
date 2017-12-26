@@ -87,10 +87,10 @@ class PdcpStats:
         + pipe + "  DL PDU Timer Based Discard                     = {0:<28}  ".format(cls.DLPDUTimerBasedDiscard)    + pipe + '\n'\
         + pipe + "  DL drb Pdcp Pdu Discard due to Status Report   = {0:<28}  ".format(cls.DrbPdcpPduDiscardDueToStatusReport) +pipe  + '\n'\
         + pipe + "  DL drb Pdcp Pdu Out Of Pdcp Descriptors        = {0:<28}  ".format(cls.DrbPdcpPduOutOfPdcpDescriptors)    + pipe  + '\n'\
-        + pipe + "  DL Out Of Memory for Trsw Uplane Send Data msg = {0:<28}  ".format(cls.OutOfMemory)   + pipe+ '\n' \
-        + pipe + "  DL total drb discard                           = {0:<28}  ".format(cls.DLTotalDrbDiscard)    + pipe+ '\n'  \
-        + pipe + "  DL total srb discard                           = {0:<28}  ".format(cls.DLTotalSrbDiscard)      +pipe+ '\n'  \
-        + pipe + "  DL total gtpu discard                          = {0:<28}  ".format(cls.DLTotalGtpuDiscard)    + pipe + '\n' \
+        + pipe + "  DL Out Of Memory for Trsw Uplane Send Data msg:                                "   + pipe+ '\n' \
+        + pipe + "     total drb discard                           = {0:<28}  ".format(cls.DLTotalDrbDiscard)    + pipe+ '\n'  \
+        + pipe + "     total srb discard                           = {0:<28}  ".format(cls.DLTotalSrbDiscard)      +pipe+ '\n'  \
+        + pipe + "     total gtpu discard                          = {0:<28}  ".format(cls.DLTotalGtpuDiscard)    + pipe + '\n' \
         + pipe + "  DL incoming PDCP Sdu                           = {0:<28}  ".format(cls.incomingPDCPSdu)     + pipe+ '\n'   \
         + pipe + "  DL Drb Pdcp pdu nacked max retrains exceeded   = {0:<28}  ".format(cls.DrbPdcpPduNacked)    + pipe+ '\n'  \
         + pipe + "  DL Drb Pdcp acked by Rlc                       = {0:<28}  ".format(cls.DrbPdcpPduAcked)  +pipe   + '\n'   \
@@ -147,6 +147,9 @@ class Ul:
 class Discard:
     pass
 
+class OOM:
+    pass
+
 class Pdcp(Parser):
 
     def __init__(self):
@@ -169,10 +172,10 @@ class Pdcp(Parser):
         self.stats.dl.discard.PduT = r'PDCP/STATS/DISCARD/DL:.*PDU:.*T ([-]?\d+ [-]?\d+ [-]?\d+)'
         self.stats.dl.discard.SR   = r'PDCP/STATS/DISCARD/DL: SR: ([-]?\d+)'
         self.stats.dl.discard.OOD  = r'PDCP/STATS/DISCARD/DL:.*OOD: ([-]?\d+)'
-        self.stats.dl.discard.OOM  = r'PDCP/STATS/DISCARD/DL:.*OOM: ([-]?\d+)'
-        self.stats.dl.discard.drb  = r'PDCP/STATS/DISCARD/DL:.*OOM: ([-]?\d+)'
-        self.stats.dl.discard.srb  = r'PDCP/STATS/DISCARD/DL:.*drb: ([-]?\d+)'
-        self.stats.dl.discard.gtpu = r'PDCP/STATS/DISCARD/DL:.*gtpu: ([-]?\d+)'
+        self.stats.dl.discard.oom  = OOM()
+        self.stats.dl.discard.oom.drb  = r'PDCP/STATS/DISCARD/DL:.*OOM.*drb: ([-]?\d+)'
+        self.stats.dl.discard.oom.srb  = r'PDCP/STATS/DISCARD/DL:.*OOM.*srb: ([-]?\d+)'
+        self.stats.dl.discard.oom.gtpu = r'PDCP/STATS/DISCARD/DL:.*OOM.*gtpu: ([-]?\d+)'
 
         self.stats.dl.drbS1 = r'PDCP/STATS/DL: DRB S1: ([-]?\d+ [-]?\d+ [-]?\d+)'
         self.stats.dl.nack  = r'PDCP/STATS/DL:.*NACK: ([-]?\d+ [-]?\d+ [-]?\d+)'
@@ -197,13 +200,11 @@ class Pdcp(Parser):
         if self.isValidData(): PdcpStats.DrbPdcpPduDiscardDueToStatusReport += sum(self.value)
         self.get(self.stats.dl.discard.OOD)
         if self.isValidData(): PdcpStats.DrbPdcpPduOutOfPdcpDescriptors += sum(self.value)
-        self.get(self.stats.dl.discard.OOM)
-        if self.isValidData(): PdcpStats.OutOfMemory += sum(self.value)
-        self.get(self.stats.dl.discard.drb)
+        self.get(self.stats.dl.discard.oom.drb)
         if self.isValidData(): PdcpStats.DLTotalDrbDiscard += sum(self.value)
-        self.get(self.stats.dl.discard.srb)
+        self.get(self.stats.dl.discard.oom.srb)
         if self.isValidData(): PdcpStats.DLTotalSrbDiscard += sum(self.value)
-        self.get(self.stats.dl.discard.gtpu)
+        self.get(self.stats.dl.discard.oom.gtpu)
         if self.isValidData(): PdcpStats.DLTotalGtpuDiscard += sum(self.value)
 
         self.get(self.stats.dl.drbS1)
