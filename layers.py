@@ -316,31 +316,49 @@ class Mac(Parser):
         self.ul.sdu.field = r'ULUE STATS 1/.*1:(\d+)'
         self.ul.pdu.field = r''
         
-'''
 class Gtp(Parser):
+    ulrx = 0
+    ultx = 0
+    dlrx = 0
+    dltx = 0
+    issues = []
     def __init__(self):
         Parser.__init__(self)
         self.ul = Ul()
         self.dl = Dl()
-        #self.count=0
-        #self.ulgtpthroughput = {}
         self.ul.sdu.field = r'DataGen/STATS.*Mbps.+=(\d+)'
 
+        self.stats = Stats()
+        self.stats.dl.rx = r'FSP-1264.*received currentSN=(\d+),'
+        self.stats.dl.tx = r'VM-1170.*createGtpu\(size=\d+, seqNumber=(\d+)\)'
+        self.stats.ul.rx = r'VM-1170.*received currentSN=(\d+)'
+        self.stats.ul.expected = r'VM-1170.*expectedSN=(\d+)'
+        self.stats.ul.tx = r'FSP-1264.*createGtpu\(size=\d+, seqNumber=(\d+)\)'
 
-    def readUl(self):
-        self.regex = re.compile(r'(FSP-\d+).*<(.*)>.*DataGen/STATS.*CPU_load=.*%.*Mbps.+=(\d+) pps=(\d+)') # GTPu from data generator
-        self.count = 4
+    def getStats(self,line):
+        self.line = line
+        self.get(self.stats.dl.rx)
+        if self.isValidData(): self.dlrx += 1
+        self.get(self.stats.dl.tx)
+        if self.isValidData(): self.dltx += 1
+        self.get(self.stats.ul.rx)
+        if self.isValidData(): 
+            self.ulrx += 1
+            current = self.value[0]
+        self.get(self.stats.ul.tx)
+        if self.isValidData(): self.ultx += 1
+        self.get(self.stats.ul.expected)
+        if self.isValidData():
+            if self.value[0] != current:
+                self.issues.append(current)
 
-    def getGtpuThroughputFromLine(self,line):
-        self.readUl()
-        values = self.search(line)
-        if values != ():
-            (core,timestamp,mbps,pps) = values
-            if core not in self.ulgtpthroughput:
-                self.ulgtpthroughput[core] = []
-            t = ptime.Time(timestamp)
-            self.ulgtpthroughput[core].append((t-0,float(mbps)*1000))
-
-    def getGtpuThroughput(self):
-        return self.ulgtpthroughput
-'''
+    def printStatistics(self):
+        print "DL packet sent : {1:<6} packet received: {0}".format(self.dlrx,self.dltx)
+        print "UL packet sent : {1:<6} packet received: {0}".format(self.ulrx,self.ultx)
+        if len(self.issues)!=0: 
+            print "   SN issues : {}".format(self.issues)
+        self.dlrx = 0
+        self.dltx = 0
+        self.ulrx = 0
+        self.ultx = 0
+        self.issues = []

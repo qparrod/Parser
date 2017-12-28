@@ -6,7 +6,7 @@ from layers import *
 import settings
 from settings import Color,ProgressBar
 from csvWriter import *
-
+from filter import *
 
 def file_len(fname):
     with open(fname) as f:
@@ -29,8 +29,9 @@ class Check:
             for line in f:
                 for pattern in self.patterns:
                     if re.search(r'{}'.format(pattern),line):
-                        self.count += 1
-                        fd.write(line)
+                        if line not in Filter.warning and line not in Filter.error:
+                            self.count += 1
+                            fd.write(line)
         fd.close()
 
     def printResult(self):
@@ -460,7 +461,7 @@ def main(argv):
         pdcp = Pdcp()
         rlc  = Rlc()
         mac  = Mac()
-        #gtp  = Gtp()
+        gtp  = Gtp()
 
         cpuload     = CpuLoad()
 
@@ -490,7 +491,7 @@ def main(argv):
                             pdcp.getStats(line)
                             rlc.getStats(line)
                             mac.getStats(line)
-                            #gtp.getStats(line)
+                            gtp.getStats(line)
 
 
                             pdcp.getDlStatistics(line)
@@ -505,6 +506,7 @@ def main(argv):
                 Warning(filename)
                 Error  (filename)
                 Custom (filename)
+                gtp.printStatistics()
         totalTime = datetime.now() - totalTime
         print "\n   \033[1mtotal time: {0:}:{1:02d}:{2:02d}.{3:03d}\033[0m\n".format(totalTime.seconds//3600,(totalTime.seconds//60)%60,totalTime.seconds,totalTime.microseconds/1000)
 
