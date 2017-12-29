@@ -3,6 +3,7 @@
 from parser import Parser
 import re
 import ptime
+from settings import Color
 
 def fromByteToBit(val):
     return val * 8
@@ -350,13 +351,15 @@ class Gtp(Parser):
         self.get(self.stats.ul.expected)
         if self.isValidData():
             if self.value[0] != current:
-                self.issues.append(current)
+                self.issues.append(self.value[0])
 
     def printStatistics(self):
-        print "DL packet sent : {1:<6} packet received: {0}".format(self.dlrx,self.dltx)
-        print "UL packet sent : {1:<6} packet received: {0}".format(self.ulrx,self.ultx)
+        if self.dltx != 0:
+            print "       DL packet sent : {1:<6} packet received: {0}".format(self.dlrx,self.dltx)
+        if self.ultx != 0:
+            print "       UL packet sent : {1:<6} packet received: {0}".format(self.ulrx,self.ultx)
         if len(self.issues)!=0: 
-            print "   SN issues : {}".format(self.issues)
+            print Color.error + "       SN issues : {}".format(self.issues) + Color.nocolor
         self.dlrx = 0
         self.dltx = 0
         self.ulrx = 0

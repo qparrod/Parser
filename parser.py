@@ -17,6 +17,9 @@ def file_len(fname):
 
 
 class Check:
+
+    color = Color.nocolor
+
     def __init__(self,path):
         self.count     = 0
         self.extension = '.txt'
@@ -26,21 +29,33 @@ class Check:
     def checkFile(self, path):
         fd = open(self.type + self.extension,'a')
         with open(path,'r') as f:
+            fd.write("---- in file {} :\n".format(path))
             for line in f:
                 for pattern in self.patterns:
                     if re.search(r'{}'.format(pattern),line):
-                        if line not in Filter.warning and line not in Filter.error:
+                        toFilter = False
+                        for e in Filter.error:
+                            if e in line:
+                               toFilter = True
+                               break
+                        for w in Filter.warning:
+                            if w in line:
+                               toFilter = True
+                               break
+                        if not toFilter:
                             self.count += 1
                             fd.write(line)
         fd.close()
 
     def printResult(self):
-        print "       Number of {0:<7} : {1:}".format(self.type,self.count)
+        if self.count != 0:
+            print self.color + "       Number of {0:<7} : {1:}".format(self.type,self.count) + Color.nocolor
 
 class Warning(Check):
     def __init__(self,path):
         self.type     = 'warning'
         self.patterns = ['WRN','Warning','WARNING']
+        self.color = Color.warning
         Check.__init__(self,path)
         
 
@@ -48,6 +63,7 @@ class Error(Check):
     def __init__(self,path):
         self.type     = 'error'
         self.patterns = ['ERR','error','ERROR']
+        self.color = Color.error
         Check.__init__(self,path)
 
 class Custom(Check):
@@ -73,8 +89,6 @@ class Parser:
         self.core      = None
         self.timestamp = None
         self.data      = None
-        #self.hasUeGroup   = False
-        #self.ueGroup  = None
 
     def fromByteToBit(self,val):
         return val * 8
